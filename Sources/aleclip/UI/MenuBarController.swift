@@ -166,11 +166,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     @objc public func checkForUpdatesAction() {
         // TODO: Switch to a real Sparkle feed when ready:
         // 1. Generate your own EdDSA public/private keypair using Sparkle's `bin/generate_keys`.
-        // 2. Add `SUPublicEDKey` (<your-ed25519-public-key>) and `SUFeedURL` (e.g. https://github.com/<MY_GITHUB_USER>/<MY_REPO>/releases/latest/download/appcast.xml) to Info.plist.
+        // 2. Add `SUPublicEDKey` (<your-ed25519-public-key>) and `SUFeedURL` (e.g. https://github.com/themanoftalent/aleclip/releases/latest/download/appcast.xml) to Info.plist.
         // 3. Integrate Sparkle.framework / SPM package `Sparkle` and call `SPUStandardUpdaterController.shared.checkForUpdates(nil)`.
         // 4. Set `SUEnableAutomaticChecks` back to YES.
         // For now, open user releases page in default web browser to prevent updating from the upstream feed:
-        if let url = URL(string: "https://github.com/<MY_GITHUB_USER>/<MY_REPO>/releases") {
+        if let url = URL(string: "https://github.com/themanoftalent/aleclip/releases") {
             NSWorkspace.shared.open(url)
         }
     }
