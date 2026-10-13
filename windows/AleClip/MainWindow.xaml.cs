@@ -214,14 +214,13 @@ public partial class MainWindow : Window
             FontWeight = FontWeights.SemiBold,
             FontSize = 12,
             Foreground = Brushes.White,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxLines = 1
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
         header.Children.Add(titleText);
         Grid.SetRow(header, 0);
         grid.Children.Add(header);
 
-        // Body: Content snippet (up to 5 lines)
+        // Body: Content snippet
         var bodyText = new TextBlock
         {
             Text = clip.PlainText,
@@ -229,7 +228,6 @@ public partial class MainWindow : Window
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxLines = 5,
             Margin = new Thickness(0, 6, 0, 6)
         };
         Grid.SetRow(bodyText, 1);
