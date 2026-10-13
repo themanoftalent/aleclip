@@ -16,18 +16,36 @@ public struct ClipCardView: View {
     public let onEdit: () -> Void
 
     @StateObject private var hoverModel = HoverViewModel()
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Header: Type badge & Pin & Relative Time
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Image(systemName: clip.type.iconName)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(typeColor)
 
                 Text(clip.type.displayName)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.primary.opacity(0.85))
+
+                if clip.isPinned {
+                    HStack(spacing: 2) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 8))
+                        Text("PIN")
+                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .foregroundColor(.orange)
+                    .background(
+                        Capsule().fill(Color.orange.opacity(0.18))
+                    )
+                }
 
                 Spacer()
 
@@ -41,11 +59,12 @@ public struct ClipCardView: View {
                         .foregroundColor(clip.isPinned ? .orange : .secondary.opacity(0.6))
                 }
                 .buttonStyle(.plain)
+                .help(clip.isPinned ? "Unpin clip" : "Pin clip")
             }
 
-            // Body Preview
+            // Body Preview (vertically balanced with frame alignment)
             contentPreview
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
             // Footer: Source App & Actions
             HStack(spacing: 4) {
@@ -92,17 +111,44 @@ public struct ClipCardView: View {
         .padding(10)
         .frame(width: 190, height: 135)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? Color(nsColor: .controlBackgroundColor).opacity(0.9) : Color(nsColor: .windowBackgroundColor).opacity(0.65))
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? Color(nsColor: .controlBackgroundColor)
+                            : (reduceTransparency ? Color(nsColor: .controlBackgroundColor) : Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.95 : 0.90))
+                    )
+
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.12))
+                }
+
+                if clip.isPinned {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.orange.opacity(0.06))
+                }
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(
-                    isSelected ? Color.accentColor : (hoverModel.isHovered ? Color.primary.opacity(0.2) : Color.primary.opacity(0.08)),
-                    lineWidth: isSelected ? 2 : 1
+                    isSelected
+                        ? Color.accentColor
+                        : (clip.isPinned
+                            ? Color.orange.opacity(0.4)
+                            : (hoverModel.isHovered
+                                ? Color.primary.opacity(0.28)
+                                : Color.primary.opacity(colorSchemeContrast == .increased ? 0.35 : 0.15))),
+                    lineWidth: isSelected ? (colorSchemeContrast == .increased ? 2.5 : 2) : 1
                 )
         )
-        .shadow(color: isSelected ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.1), radius: isSelected ? 6 : 2, x: 0, y: 2)
+        .shadow(
+            color: isSelected ? Color.accentColor.opacity(0.3) : Color.black.opacity(colorScheme == .dark ? 0.25 : 0.08),
+            radius: isSelected ? 5 : 2,
+            x: 0,
+            y: 1
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             onSelect()
@@ -211,17 +257,17 @@ public struct ClipCardView: View {
             }
 
         case .text, .richText, .html:
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 if let title = clip.title {
                     Text(title)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.primary)
                         .lineLimit(1)
                 }
                 Text(clip.plainText)
-                    .font(.system(size: 10, design: .default))
-                    .foregroundColor(.primary.opacity(0.85))
-                    .lineLimit(clip.title != nil ? 3 : 4)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(.primary)
+                    .lineLimit(clip.title != nil ? 4 : 5)
                     .truncationMode(.tail)
             }
         }

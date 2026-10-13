@@ -6,7 +6,7 @@ public class FloatingPanel: NSPanel {
     public init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
         )
@@ -17,8 +17,6 @@ public class FloatingPanel: NSPanel {
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = true
-        self.titleVisibility = .hidden
-        self.titlebarAppearsTransparent = true
     }
 
     public override var canBecomeKey: Bool {
@@ -40,6 +38,7 @@ public final class FloatingPanelController: ObservableObject {
     @Published public var selectedFilter: FilterTab = .all
     @Published public var previewClip: ClipItem? = nil
     @Published public var editingClip: ClipItem? = nil
+    @Published public var showShortcutsPopover: Bool = false
 
     public private(set) var previousApp: NSRunningApplication?
     private var panel: FloatingPanel?
@@ -107,6 +106,7 @@ public final class FloatingPanelController: ObservableObject {
         self.selectedIndex = 0
         self.previewClip = nil
         self.editingClip = nil
+        self.showShortcutsPopover = false
 
         // Position at bottom center of screen
         if let screen = NSScreen.main {
@@ -141,6 +141,7 @@ public final class FloatingPanelController: ObservableObject {
             DispatchQueue.main.async {
                 panel.orderOut(nil)
                 self?.isVisible = false
+                self?.showShortcutsPopover = false
             }
         })
     }

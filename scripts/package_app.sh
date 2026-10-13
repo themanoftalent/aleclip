@@ -43,6 +43,10 @@ cat <<EOF > "${CONTENTS}/Info.plist"
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIconName</key>

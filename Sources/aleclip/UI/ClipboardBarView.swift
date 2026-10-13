@@ -4,30 +4,27 @@ import AppKit
 // MARK: - Watermark View
 
 public struct WatermarkView: View {
-    // MARK: - Configuration Constants
-    public static let text: String = "ALE"
-    public static let opacity: Double = 0.06
-    public static let heightRatio: CGFloat = 0.70
+    @Environment(\.colorScheme) private var colorScheme
 
     public init() {}
 
     public var body: some View {
-        GeometryReader { geo in
-            Text(Self.text)
-                .font(.system(size: geo.size.height * Self.heightRatio, weight: .heavy, design: .rounded))
-                .foregroundColor(.primary.opacity(Self.opacity))
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        let opacity = colorScheme == .dark ? 0.07 : 0.05
+        Text("ALE")
+            .font(.system(size: 72, weight: .heavy, design: .rounded))
+            .foregroundColor(.primary.opacity(opacity))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
 public struct ClipboardBarView: View {
     @ObservedObject private var controller = FloatingPanelController.shared
     @ObservedObject private var storage = StorageService.shared
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init() {}
 
@@ -36,9 +33,10 @@ public struct ClipboardBarView: View {
 
         ZStack {
             // Main Panel Content
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 // Header Bar: Search & Filter Tabs
                 headerBar(itemsCount: items.count)
+                    .padding(.top, 4)
 
                 // Middle: Horizontal Card Deck
                 ScrollViewReader { proxy in
@@ -92,21 +90,28 @@ public struct ClipboardBarView: View {
 
                 // Footer Bar: Keyboard shortcuts info
                 footerBar(itemsCount: items.count)
+                    .padding(.bottom, 4)
             }
             .padding(.vertical, 12)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    WatermarkView()
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(reduceTransparency ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .windowBackgroundColor).opacity(0.85))
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        )
+                    watermarkLayer(itemsCount: items.count)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        Color.primary.opacity(colorSchemeContrast == .increased ? 0.35 : (colorScheme == .dark ? 0.20 : 0.12)),
+                        lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
+                    )
             )
-            .shadow(color: Color.black.opacity(0.35), radius: 24, x: 0, y: 12)
 
             // Overlays: Quick Look
             if let previewClip = controller.previewClip {
@@ -152,7 +157,34 @@ public struct ClipboardBarView: View {
             }
         }
         .frame(width: 880, height: 260)
-        .padding(8)
+    }
+
+    // MARK: - Watermark Layer
+
+    @ViewBuilder
+    private func watermarkLayer(itemsCount: Int) -> some View {
+        GeometryReader { geo in
+            let cardsWidth = CGFloat(itemsCount) * (190 + 12) + 32
+            let remainingWidth = geo.size.width - cardsWidth
+
+            ZStack {
+                if itemsCount == 0 {
+                    WatermarkView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                } else if remainingWidth > 180 {
+                    HStack(spacing: 0) {
+                        Spacer().frame(width: cardsWidth)
+                        WatermarkView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    }
+                } else {
+                    WatermarkView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: - Header Bar
@@ -250,24 +282,33 @@ public struct ClipboardBarView: View {
 
     private func footerBar(itemsCount: Int) -> some View {
         HStack {
-            Text("\(itemsCount) clips")
-                .font(.system(size: 10, weight: .medium))
+            Text("\(itemsCount) \(itemsCount == 1 ? "clip" : "clips")")
+                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.secondary)
 
             Spacer()
 
-            HStack(spacing: 11) {
+            HStack(spacing: 12) {
                 keyTip(key: "← →", desc: "Navigate")
                 keyTip(key: "↵", desc: "Paste")
-                keyTip(key: "⇧↵", desc: "Plain Text")
                 keyTip(key: "Space", desc: "Preview")
-                keyTip(key: "⌘E", desc: "Edit")
-                keyTip(key: "⌫", desc: "Delete")
-                keyTip(key: "⌘,", desc: "Settings")
                 keyTip(key: "Esc", desc: "Close")
+
+                Button(action: {
+                    controller.showShortcutsPopover.toggle()
+                }) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Keyboard Shortcuts Guide")
+                .popover(isPresented: $controller.showShortcutsPopover, arrowEdge: .top) {
+                    shortcutsPopoverView
+                }
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 16)
     }
 
     private func keyTip(key: String, desc: String) -> some View {
@@ -283,20 +324,73 @@ public struct ClipboardBarView: View {
         }
     }
 
+    private var shortcutsPopoverView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.accentColor)
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Keyboard Shortcuts")
+                    .font(.system(size: 12, weight: .bold))
+            }
+
+            Divider()
+
+            VStack(spacing: 6) {
+                popoverShortcutRow(keys: ["⌥", "V"], action: "Open / Dismiss panel")
+                popoverShortcutRow(keys: ["←", "→"], action: "Navigate clips")
+                popoverShortcutRow(keys: ["↵"], action: "Paste into active app")
+                popoverShortcutRow(keys: ["⇧", "↵"], action: "Paste as plain text")
+                popoverShortcutRow(keys: ["Space"], action: "Quick Look preview")
+                popoverShortcutRow(keys: ["⌘", "E"], action: "Edit text clip")
+                popoverShortcutRow(keys: ["⌫"], action: "Delete clip")
+                popoverShortcutRow(keys: ["⌘", ","], action: "Open Settings")
+                popoverShortcutRow(keys: ["Esc"], action: "Close panel")
+            }
+        }
+        .padding(12)
+        .frame(width: 240)
+    }
+
+    private func popoverShortcutRow(keys: [String], action: String) -> some View {
+        HStack {
+            Text(action)
+                .font(.system(size: 11))
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            HStack(spacing: 3) {
+                ForEach(keys, id: \.self) { key in
+                    Text(key)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(nsColor: .controlBackgroundColor))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 3)
+                                .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                        )
+                }
+            }
+        }
+    }
+
     // MARK: - Empty State
 
     private var emptyStateView: some View {
         VStack(spacing: 8) {
-            Image(systemName: "tray")
-                .font(.system(size: 32))
-                .foregroundColor(.secondary.opacity(0.6))
-            Text("No clips found")
+            Image(systemName: controller.searchText.isEmpty ? "tray" : "magnifyingglass")
+                .font(.system(size: 28))
+                .foregroundColor(.secondary.opacity(0.7))
+
+            Text(controller.searchText.isEmpty ? "No clips yet. Copy something to start." : "No clips match your search.")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
-            Text("Copy text, images, links, or colors to see them here.")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary.opacity(0.7))
         }
-        .frame(width: 840, height: 130)
+        .frame(width: 848, height: 145, alignment: .center)
     }
 }

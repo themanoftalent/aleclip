@@ -8,6 +8,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
+    private var aboutWindow: NSWindow?
 
     private override init() {
         super.init()
@@ -34,7 +35,27 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     public func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // 1. Toggle Panel Item
+        // 1. About AleClip
+        let aboutItem = NSMenuItem(
+            title: "About AleClip",
+            action: #selector(openAboutAction),
+            keyEquivalent: ""
+        )
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        // 2. Check for Updates...
+        let updateItem = NSMenuItem(
+            title: "Check for Updates…",
+            action: #selector(checkForUpdatesAction),
+            keyEquivalent: ""
+        )
+        updateItem.target = self
+        menu.addItem(updateItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // 3. Toggle Panel Item
         let openItem = NSMenuItem(
             title: "Open Clipboard Panel",
             action: #selector(openPanelAction),
@@ -118,6 +139,38 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func clearHistoryAction() {
         StorageService.shared.clearUnpinned()
+    }
+
+    @objc public func openAboutAction() {
+        if aboutWindow == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 360, height: 260),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "About AleClip"
+            window.center()
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: AboutView())
+            self.aboutWindow = window
+        }
+
+        aboutWindow?.center()
+        aboutWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc public func checkForUpdatesAction() {
+        // TODO: Switch to a real Sparkle feed when ready:
+        // 1. Generate your own EdDSA public/private keypair using Sparkle's `bin/generate_keys`.
+        // 2. Add `SUPublicEDKey` (<your-ed25519-public-key>) and `SUFeedURL` (e.g. https://github.com/<MY_GITHUB_USER>/<MY_REPO>/releases/latest/download/appcast.xml) to Info.plist.
+        // 3. Integrate Sparkle.framework / SPM package `Sparkle` and call `SPUStandardUpdaterController.shared.checkForUpdates(nil)`.
+        // 4. Set `SUEnableAutomaticChecks` back to YES.
+        // For now, open user releases page in default web browser to prevent updating from the upstream feed:
+        if let url = URL(string: "https://github.com/<MY_GITHUB_USER>/<MY_REPO>/releases") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc public func openSettingsAction() {
