@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>A modern, lightweight native clipboard manager for macOS and Windows.</strong><br>
-  Built natively with Swift 6, AppKit &amp; SwiftUI (macOS) and .NET 8 WPF (Windows).
+  <strong>A modern, lightweight native clipboard manager for macOS.</strong><br>
+  Built natively with Swift 6, AppKit, and SwiftUI.
 </p>
 
 <p align="center">
@@ -108,19 +108,12 @@ The output files will be created at:
 - `AleClip.app` (Installed to `/Applications/AleClip.app`)
 - `AleClip.dmg` (Distribution disk image with drag-and-drop `/Applications` link)
 
-### Building for Windows (`.exe`)
-Requirements:
-- **Windows 10 / 11 (64-bit)**
-- **.NET 8.0 SDK**
+---
 
-To publish a self-contained, single-file Windows executable:
-```bash
-cd windows/AleClip
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
-```
-The output file is **`AleClip.exe`**, a standalone binary ready to run on any Windows PC without prerequisites.
+## 🪟 Windows Version
 
-*(Windows builds are also automatically compiled and published to [GitHub Releases](https://github.com/themanoftalent/aleclip/releases) via GitHub Actions).*
+Looking for the native Windows edition (`AleClip.exe`)?  
+Visit the dedicated repository: [**themanoftalent/aleclip-windows**](https://github.com/themanoftalent/aleclip-windows)
 
 ---
 
