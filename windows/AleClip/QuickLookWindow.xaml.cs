@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using AleClip.Models;
 using AleClip.Services;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
 namespace AleClip;
 

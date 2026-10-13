@@ -9,6 +9,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using AleClip.Models;
 using AleClip.Services;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
 namespace AleClip;
 
