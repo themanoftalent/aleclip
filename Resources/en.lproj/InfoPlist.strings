@@ -1,0 +1,6 @@
+/* InfoPlist.strings (English) */
+
+"CFBundleDisplayName" = "AleClip";
+"CFBundleName" = "AleClip";
+"NSHumanReadableCopyright" = "© 2026 SoftAI Yazılım";
+"NSAccessibilityUsageDescription" = "AleClip needs Accessibility access to synthesize paste keystrokes into your active applications.";

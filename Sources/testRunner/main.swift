@@ -82,6 +82,27 @@ func runTests() {
     try? FileManager.default.removeItem(at: backupFile)
     print("  ✔ JSON export/import and deduplication passed")
 
+    // 7. Turkish localized search (dotted / dotless I & diacritics)
+    let turkishClip = ClipItem(
+        type: .text,
+        plainText: "İstanbul Işıkları ve Çınar Ağaçları",
+        contentHash: "trhash1"
+    )
+    assert(turkishClip.matches(query: "istanbul") || turkishClip.matches(query: "İSTANBUL"), "Turkish search matching")
+    assert(turkishClip.matches(query: "çınar"), "Turkish character matching")
+    assert(turkishClip.matches(query: "ağaç"), "Turkish ğ character matching")
+    print("  ✔ Turkish characters & case-folding search passed")
+
+    // 8. Localization strings validation
+    LocalizationService.shared.setLanguage("en")
+    assert(loc("panel.searchPlaceholder") == "Search clips...", "English search placeholder")
+    assert(loc("about.developedBy") == "Developed by SoftAI Yazılım", "English developer line")
+
+    LocalizationService.shared.setLanguage("tr")
+    assert(loc("panel.searchPlaceholder") == "Panoda ara...", "Turkish search placeholder")
+    assert(loc("about.developedBy") == "SoftAI Yazılım tarafından geliştirildi", "Turkish developer line")
+    print("  ✔ Localization service English & Turkish strings passed")
+
     print("\n✅ All AleClip tests passed successfully!")
 }
 

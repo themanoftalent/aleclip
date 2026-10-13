@@ -10,6 +10,16 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
 
     public var id: String { rawValue }
 
+    public var title: String {
+        switch self {
+        case .general: return loc("settings.tab.general")
+        case .shortcuts: return loc("settings.tab.shortcuts")
+        case .exclusions: return loc("settings.tab.exclusions")
+        case .backup: return loc("settings.tab.backup")
+        case .about: return loc("settings.tab.about")
+        }
+    }
+
     public var iconName: String {
         switch self {
         case .general: return "gearshape.fill"
@@ -21,15 +31,27 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
     }
 }
 
+enum SettingsAlertItem: Identifiable {
+    case info(String)
+    case languageRestart
+
+    var id: String {
+        switch self {
+        case .info(let m): return "info-\(m)"
+        case .languageRestart: return "restart"
+        }
+    }
+}
+
 final class SettingsViewModel: ObservableObject {
     @Published var selectedTab: SettingsTab = .general
     @Published var newBundleId: String = ""
-    @Published var alertMessage: String?
-    @Published var showAlert: Bool = false
+    @Published var activeAlert: SettingsAlertItem? = nil
 }
 
 public struct SettingsView: View {
     @ObservedObject private var storage = StorageService.shared
+    @ObservedObject private var l10n = LocalizationService.shared
     @StateObject private var model = SettingsViewModel()
 
     public init() {}
@@ -67,12 +89,24 @@ public struct SettingsView: View {
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
         }
         .frame(width: 620, height: 530)
-        .alert(isPresented: $model.showAlert) {
-            Alert(
-                title: Text("AleClip"),
-                message: Text(model.alertMessage ?? ""),
-                dismissButton: .default(Text("OK"))
-            )
+        .alert(item: $model.activeAlert) { item in
+            switch item {
+            case .info(let message):
+                return Alert(
+                    title: Text("AleClip"),
+                    message: Text(message),
+                    dismissButton: .default(Text("OK"))
+                )
+            case .languageRestart:
+                return Alert(
+                    title: Text(loc("settings.alert.langRestartTitle")),
+                    message: Text(loc("settings.alert.langRestartMsg")),
+                    primaryButton: .default(Text(loc("settings.alert.restartNow")), action: {
+                        LocalizationService.relaunchApp()
+                    }),
+                    secondaryButton: .cancel(Text(loc("settings.alert.later")))
+                )
+            }
         }
     }
 
@@ -89,7 +123,7 @@ public struct SettingsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: tab.iconName)
                             .font(.system(size: 12))
-                        Text(tab.rawValue)
+                        Text(tab.title)
                             .font(.system(size: 13, weight: model.selectedTab == tab ? .semibold : .regular))
                     }
                     .padding(.horizontal, 12)
@@ -110,19 +144,43 @@ public struct SettingsView: View {
 
     private var generalContent: some View {
         VStack(alignment: .leading, spacing: 18) {
+            // Language Picker Card
+            settingsCard(title: loc("settings.general.language"), icon: "globe") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(loc("settings.general.language") + ":")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: { LocalizationService.shared.getSelectedLanguageSetting() },
+                            set: { newValue in
+                                LocalizationService.shared.setLanguage(newValue)
+                                model.activeAlert = .languageRestart
+                            }
+                        )) {
+                            Text(loc("settings.general.langSystem")).tag("system")
+                            Text(loc("settings.general.langEn")).tag("en")
+                            Text(loc("settings.general.langTr")).tag("tr")
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 200)
+                    }
+                }
+            }
+
             // History Limits Card
-            settingsCard(title: "History Limits", icon: "clock.arrow.circlepath") {
+            settingsCard(title: loc("settings.general.historyLimits"), icon: "clock.arrow.circlepath") {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("Maximum items stored in history:")
+                        Text(loc("settings.general.maxItems"))
                             .font(.system(size: 13))
                         Spacer()
                         Picker("", selection: $storage.settings.historyLimit) {
-                            Text("50 clips").tag(50)
-                            Text("100 clips").tag(100)
-                            Text("200 clips").tag(200)
-                            Text("500 clips").tag(500)
-                            Text("1000 clips").tag(1000)
+                            Text(locF("footer.clips", 50)).tag(50)
+                            Text(locF("footer.clips", 100)).tag(100)
+                            Text(locF("footer.clips", 200)).tag(200)
+                            Text(locF("footer.clips", 500)).tag(500)
+                            Text(locF("footer.clips", 1000)).tag(1000)
                         }
                         .pickerStyle(.menu)
                         .frame(width: 140)
@@ -131,16 +189,16 @@ public struct SettingsView: View {
                         }
                     }
 
-                    Text("Older unpinned clips are automatically purged when history exceeds this limit. Pinned clips are always preserved.")
+                    Text(loc("settings.general.historyHelp"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
 
             // Paste Behavior Card
-            settingsCard(title: "Paste Behavior", icon: "doc.on.clipboard") {
+            settingsCard(title: loc("settings.general.pasteBehavior"), icon: "doc.on.clipboard") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Paste directly into active application upon selection", isOn: $storage.settings.pasteIntoActiveApp)
+                    Toggle(loc("settings.general.pasteDirectly"), isOn: $storage.settings.pasteIntoActiveApp)
                         .font(.system(size: 13))
                         .onChange(of: storage.settings.pasteIntoActiveApp) { _, _ in
                             storage.saveSettings()
@@ -153,9 +211,9 @@ public struct SettingsView: View {
                                 .font(.system(size: 15))
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(PasteService.shared.isAccessibilityTrusted ? "Accessibility Permission Granted" : "Accessibility Permission Required")
+                                Text(loc(PasteService.shared.isAccessibilityTrusted ? "settings.general.accessGranted" : "settings.general.accessRequired"))
                                     .font(.system(size: 12, weight: .semibold))
-                                Text(PasteService.shared.isAccessibilityTrusted ? "AleClip can synthesize ⌘V directly into your active apps." : "macOS requires Accessibility access to simulate paste keystrokes.")
+                                Text(loc(PasteService.shared.isAccessibilityTrusted ? "settings.general.accessGrantedDesc" : "settings.general.accessRequiredDesc"))
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -163,7 +221,7 @@ public struct SettingsView: View {
                             Spacer()
 
                             if !PasteService.shared.isAccessibilityTrusted {
-                                Button("Open System Settings") {
+                                Button(loc("settings.general.openSysSettings")) {
                                     PasteService.shared.promptAccessibilityIfNeeded()
                                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                                         NSWorkspace.shared.open(url)
@@ -182,7 +240,7 @@ public struct SettingsView: View {
 
                     Divider()
 
-                    Toggle("Always paste as unformatted plain text (strip rich text & HTML styling)", isOn: $storage.settings.plainTextAlways)
+                    Toggle(loc("settings.general.plainTextAlways"), isOn: $storage.settings.plainTextAlways)
                         .font(.system(size: 13))
                         .onChange(of: storage.settings.plainTextAlways) { _, _ in
                             storage.saveSettings()
@@ -191,8 +249,8 @@ public struct SettingsView: View {
             }
 
             // Sound Effects Card
-            settingsCard(title: "Audio Feedback", icon: "speaker.wave.2") {
-                Toggle("Play sound feedback when copying or pasting clips", isOn: $storage.settings.soundEffects)
+            settingsCard(title: loc("settings.general.audioFeedback"), icon: "speaker.wave.2") {
+                Toggle(loc("settings.general.soundEffects"), isOn: $storage.settings.soundEffects)
                     .font(.system(size: 13))
                     .onChange(of: storage.settings.soundEffects) { _, _ in
                         storage.saveSettings()
@@ -206,10 +264,10 @@ public struct SettingsView: View {
     private var shortcutsContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             // Global Hotkey Card
-            settingsCard(title: "Global Activation Shortcut", icon: "command") {
+            settingsCard(title: loc("settings.shortcuts.globalTitle"), icon: "command") {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("Shortcut to open/close AleClip:")
+                        Text(loc("settings.shortcuts.globalDesc"))
                             .font(.system(size: 13))
                         Spacer()
                         Picker("", selection: $storage.settings.selectedShortcut) {
@@ -225,23 +283,23 @@ public struct SettingsView: View {
                         }
                     }
 
-                    Text("Pressing this global shortcut from any app brings up the non-activating bottom panel without stealing window focus.")
+                    Text(loc("settings.shortcuts.globalHelp"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
 
             // Keyboard Shortcuts Guide Card
-            settingsCard(title: "In-Panel Keyboard Shortcuts", icon: "keyboard") {
+            settingsCard(title: loc("settings.shortcuts.guideTitle"), icon: "keyboard") {
                 VStack(spacing: 8) {
-                    shortcutRow(keys: ["⌥", "V"], action: "Open / Dismiss AleClip bottom panel")
-                    shortcutRow(keys: ["←", "→"], action: "Navigate between clipboard cards")
-                    shortcutRow(keys: ["↵"], action: "Paste selected clip into frontmost app")
-                    shortcutRow(keys: ["⇧", "↵"], action: "Paste clip as unformatted plain text")
-                    shortcutRow(keys: ["Space"], action: "Quick Look preview (text, images, links, files, colors)")
-                    shortcutRow(keys: ["⌘", "E"], action: "Edit text clip content or assign custom title")
-                    shortcutRow(keys: ["⌫"], action: "Delete selected clip from history")
-                    shortcutRow(keys: ["Esc"], action: "Dismiss the panel without pasting")
+                    shortcutRow(keys: ["⌥", "V"], action: loc("settings.shortcuts.togglePanel"))
+                    shortcutRow(keys: ["←", "→"], action: loc("settings.shortcuts.navigateCards"))
+                    shortcutRow(keys: ["↵"], action: loc("settings.shortcuts.pasteClip"))
+                    shortcutRow(keys: ["⇧", "↵"], action: loc("settings.shortcuts.plainPaste"))
+                    shortcutRow(keys: ["Space"], action: loc("settings.shortcuts.quickLook"))
+                    shortcutRow(keys: ["⌘", "E"], action: loc("settings.shortcuts.editClip"))
+                    shortcutRow(keys: ["⌫"], action: loc("settings.shortcuts.deleteClip"))
+                    shortcutRow(keys: ["Esc"], action: loc("settings.shortcuts.dismissPanel"))
                 }
             }
         }
@@ -279,9 +337,9 @@ public struct SettingsView: View {
 
     private var exclusionsContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            settingsCard(title: "Excluded Applications", icon: "hand.raised") {
+            settingsCard(title: loc("settings.exclusions.title"), icon: "hand.raised") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Copies made while any of these applications are frontmost will never be captured or stored.")
+                    Text(loc("settings.exclusions.help"))
                         .font(.caption)
                         .foregroundColor(.secondary)
 
@@ -289,7 +347,7 @@ public struct SettingsView: View {
                     ScrollView {
                         VStack(spacing: 6) {
                             if storage.settings.excludedBundleIds.isEmpty {
-                                Text("No applications excluded yet.")
+                                Text(loc("settings.exclusions.empty"))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .padding()
@@ -327,7 +385,7 @@ public struct SettingsView: View {
 
                     // Add Buttons
                     HStack(spacing: 8) {
-                        Button("Choose Application from Mac...") {
+                        Button(loc("settings.exclusions.chooseApp")) {
                             chooseApplication()
                         }
                         .buttonStyle(.bordered)
@@ -336,10 +394,10 @@ public struct SettingsView: View {
                     }
 
                     HStack(spacing: 8) {
-                        TextField("Or enter bundle ID (e.g. com.example.app)", text: $model.newBundleId)
+                        TextField(loc("settings.exclusions.enterBundle"), text: $model.newBundleId)
                             .textFieldStyle(.roundedBorder)
 
-                        Button("Add") {
+                        Button(loc("settings.exclusions.add")) {
                             let trimmed = model.newBundleId.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !trimmed.isEmpty else { return }
                             if !storage.settings.excludedBundleIds.contains(trimmed) {
@@ -377,19 +435,19 @@ public struct SettingsView: View {
 
     private var backupContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            settingsCard(title: "History Backup & Restore", icon: "arrow.triangle.2.circlepath") {
+            settingsCard(title: loc("settings.backup.title"), icon: "arrow.triangle.2.circlepath") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Export your clipboard history as a standard JSON file, or restore from a previous backup. Duplicate clips are automatically skipped.")
+                    Text(loc("settings.backup.help"))
                         .font(.caption)
                         .foregroundColor(.secondary)
 
                     HStack(spacing: 12) {
-                        Button("Export History to JSON...") {
+                        Button(loc("settings.backup.exportBtn")) {
                             exportHistory()
                         }
                         .buttonStyle(.borderedProminent)
 
-                        Button("Import History from JSON...") {
+                        Button(loc("settings.backup.importBtn")) {
                             importHistory()
                         }
                         .buttonStyle(.bordered)
@@ -397,16 +455,15 @@ public struct SettingsView: View {
                 }
             }
 
-            settingsCard(title: "Manage Stored Data", icon: "trash") {
+            settingsCard(title: loc("settings.backup.manageTitle"), icon: "trash") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Remove all unpinned items from the history database. Pinned clips and preferences will remain intact.")
+                    Text(loc("settings.backup.manageHelp"))
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    Button("Clear All Unpinned Clips", role: .destructive) {
+                    Button(loc("settings.backup.clearUnpinnedBtn"), role: .destructive) {
                         storage.clearUnpinned()
-                        model.alertMessage = "All unpinned clips have been cleared."
-                        model.showAlert = true
+                        model.activeAlert = .info(loc("settings.backup.clearSuccess"))
                     }
                     .buttonStyle(.bordered)
                 }
@@ -421,11 +478,9 @@ public struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try storage.exportJSON(to: url)
-                model.alertMessage = "History successfully exported!"
-                model.showAlert = true
+                model.activeAlert = .info(loc("settings.backup.exportSuccess"))
             } catch {
-                model.alertMessage = "Export failed: \(error.localizedDescription)"
-                model.showAlert = true
+                model.activeAlert = .info(locF("settings.backup.exportFailed", error.localizedDescription))
             }
         }
     }
@@ -437,11 +492,9 @@ public struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 let count = try storage.importJSON(from: url)
-                model.alertMessage = "Successfully imported \(count) new clips!"
-                model.showAlert = true
+                model.activeAlert = .info(locF("settings.backup.importSuccess", count))
             } catch {
-                model.alertMessage = "Import failed: \(error.localizedDescription)"
-                model.showAlert = true
+                model.activeAlert = .info(locF("settings.backup.importFailed", error.localizedDescription))
             }
         }
     }
@@ -467,22 +520,17 @@ public struct SettingsView: View {
             VStack(spacing: 3) {
                 Text("AleClip")
                     .font(.system(size: 22, weight: .bold))
-                Text("Version 1.0.0 (Build 1)")
+                Text(locF("about.version", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             // Developer Credit
-            HStack(spacing: 5) {
-                Text("Developed by")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                Text("Mehmet Akif Çifçi")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
-            }
+            Text(loc("about.developedBy"))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.primary)
 
-            Text("A modern, lightweight native clipboard manager for macOS with card history, Quick Look, and non-activating bottom panel.")
+            Text(loc("about.tagline"))
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -494,7 +542,7 @@ public struct SettingsView: View {
                     Image(systemName: "hand.raised.slash.fill")
                         .foregroundColor(.green)
                         .font(.system(size: 11))
-                    Text("Zero Data Collection")
+                    Text(loc("settings.about.zeroData"))
                         .font(.system(size: 11, weight: .medium))
                 }
                 .padding(.horizontal, 10)
@@ -512,7 +560,7 @@ public struct SettingsView: View {
                     Image(systemName: "gift.fill")
                         .foregroundColor(.blue)
                         .font(.system(size: 11))
-                    Text("100% Free for Everyone")
+                    Text(loc("settings.about.freeEveryone"))
                         .font(.system(size: 11, weight: .medium))
                 }
                 .padding(.horizontal, 10)
@@ -530,7 +578,7 @@ public struct SettingsView: View {
                     Image(systemName: "arrow.triangle.branch")
                         .foregroundColor(.orange)
                         .font(.system(size: 11))
-                    Text("Free to Fork & Customize")
+                    Text(loc("settings.about.freeFork"))
                         .font(.system(size: 11, weight: .medium))
                 }
                 .padding(.horizontal, 10)
@@ -548,12 +596,12 @@ public struct SettingsView: View {
             Divider().frame(width: 360)
 
             VStack(spacing: 4) {
-                Text("\(storage.clips.count) clips in history • \(storage.clips.filter { $0.isPinned }.count) pinned")
+                Text(locF("settings.about.clipsStats", storage.clips.count, storage.clips.filter { $0.isPinned }.count))
                     .font(.caption.bold())
-                Text("All clipboard content is stored strictly locally on your Mac. No network telemetry.")
+                Text(loc("settings.about.localOnly"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                Text("Built natively with Swift 6, AppKit, and SwiftUI.")
+                Text(loc("settings.about.techStack"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

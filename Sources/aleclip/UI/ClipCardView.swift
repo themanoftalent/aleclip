@@ -36,7 +36,7 @@ public struct ClipCardView: View {
                     HStack(spacing: 2) {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 8))
-                        Text("PIN")
+                        Text(loc("card.pinnedBadge"))
                             .font(.system(size: 8, weight: .bold, design: .rounded))
                     }
                     .padding(.horizontal, 4)
@@ -59,7 +59,7 @@ public struct ClipCardView: View {
                         .foregroundColor(clip.isPinned ? .orange : .secondary.opacity(0.6))
                 }
                 .buttonStyle(.plain)
-                .help(clip.isPinned ? "Unpin clip" : "Pin clip")
+                .help(loc(clip.isPinned ? "card.unpin" : "card.pin"))
             }
 
             // Body Preview (vertically balanced with frame alignment)
@@ -85,7 +85,7 @@ public struct ClipCardView: View {
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .help("Quick Look (Space)")
+                        .help(loc("card.quickLook"))
 
                         if clip.type == .text || clip.type == .richText {
                             Button(action: onEdit) {
@@ -94,7 +94,7 @@ public struct ClipCardView: View {
                                     .foregroundColor(.secondary)
                             }
                             .buttonStyle(.plain)
-                            .help("Edit (⌘E)")
+                            .help(loc("card.edit"))
                         }
 
                         Button(action: onDelete) {
@@ -103,7 +103,7 @@ public struct ClipCardView: View {
                                 .foregroundColor(.red.opacity(0.8))
                         }
                         .buttonStyle(.plain)
-                        .help("Delete (⌫)")
+                        .help(loc("card.delete"))
                     }
                 }
             }
@@ -162,25 +162,25 @@ public struct ClipCardView: View {
             hoverModel.isHovered = hovering
         }
         .contextMenu {
-            Button("Paste into Active App") {
+            Button(loc("context.paste")) {
                 onPaste()
             }
-            Button("Copy to Clipboard") {
+            Button(loc("context.copy")) {
                 PasteService.shared.copyToClipboard(clip)
             }
-            Button(clip.isPinned ? "Unpin Clip" : "Pin Clip") {
+            Button(loc(clip.isPinned ? "context.unpin" : "context.pin")) {
                 onTogglePin()
             }
             if clip.type == .text || clip.type == .richText {
-                Button("Edit Text...") {
+                Button(loc("context.editText")) {
                     onEdit()
                 }
             }
-            Button("Quick Look Preview") {
+            Button(loc("context.quickLook")) {
                 onQuickLook()
             }
             Divider()
-            Button("Delete Clip", role: .destructive) {
+            Button(loc("context.delete"), role: .destructive) {
                 onDelete()
             }
         }
@@ -202,7 +202,7 @@ public struct ClipCardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(clip.colorHex ?? "#000000")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    Text("RGB Color")
+                    Text(loc("card.rgbColor"))
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
                 }

@@ -21,7 +21,7 @@
 
 ## 👨‍💻 Developed By
 
-**Developed by Mehmet Akif Çifçi**  
+**Developed by SoftAI Yazılım (Mehmet Akif Çifçi)**  
 *Designed to be completely free, private, and accessible for everyone.*
 
 ---
@@ -55,6 +55,8 @@
   - **Exclusions**: Block sensitive apps (1Password, Bitwarden, Keychain, etc.) from being recorded, with an interactive macOS app picker.
   - **Backup & Restore**: Export history to a standard `.json` file, restore with automatic deduplication, or prune unpinned items.
   - **About**: Live clip counter, developer credits, and privacy highlights.
+- **Full Turkish & English Localization**: Seamless bilingual support across all panels, menus, settings, and shortcuts with dotted/dotless `I/ı/İ/i` search case-folding.
+- **Custom URL Scheme**: Control AleClip from scripts, terminal, or automations via `aleclip://toggle`, `aleclip://show`, `aleclip://settings`, and `aleclip://about`.
 - **Menu Bar Agent**: Lightweight status bar item showing recent clips, pin states, and quick access to Settings or History Purge.
 
 ---
@@ -111,4 +113,4 @@ The output files will be created at:
 ## 📄 License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.  
-Created and maintained by **Mehmet Akif Çifçi**.
+Created and maintained by **SoftAI Yazılım (Mehmet Akif Çifçi)**.

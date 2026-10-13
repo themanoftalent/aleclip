@@ -25,6 +25,14 @@ if [ -f "${DIR}/Resources/AppIcon.icns" ]; then
     cp "${DIR}/Resources/AppIcon.icns" "${RESOURCES}/AppIcon.icns"
 fi
 
+# Copy localized resources
+if [ -d "${DIR}/Resources/en.lproj" ]; then
+    cp -R "${DIR}/Resources/en.lproj" "${RESOURCES}/"
+fi
+if [ -d "${DIR}/Resources/tr.lproj" ]; then
+    cp -R "${DIR}/Resources/tr.lproj" "${RESOURCES}/"
+fi
+
 # Create Info.plist
 cat <<EOF > "${CONTENTS}/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -45,6 +53,28 @@ cat <<EOF > "${CONTENTS}/Info.plist"
     <string>1.0.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 SoftAI Yazılım</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>tr</string>
+    </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.darwin.aleclip</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>aleclip</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>AleClip needs Accessibility access to synthesize paste keystrokes into your active applications.</string>
     <key>SUEnableAutomaticChecks</key>
     <false/>
     <key>CFBundleIconFile</key>

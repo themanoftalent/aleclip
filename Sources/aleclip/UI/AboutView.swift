@@ -2,10 +2,12 @@ import SwiftUI
 import AppKit
 
 public struct AboutView: View {
+    @ObservedObject private var l10n = LocalizationService.shared
+
     private var versionString: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
-        return "Version \(version) (\(build))"
+        return locF("about.version", version, build)
     }
 
     public init() {}
@@ -34,7 +36,7 @@ public struct AboutView: View {
                     .foregroundColor(.secondary)
             }
 
-            Text("A modern, lightweight native clipboard manager for macOS.")
+            Text(loc("about.tagline"))
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -43,10 +45,9 @@ public struct AboutView: View {
             Divider().padding(.horizontal, 24)
 
             VStack(spacing: 4) {
-                Text("Based on [Clipbara by mobrava](https://github.com/mobrava/Clipbara). Licensed under [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html).")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                Text(loc("about.developedBy"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
             }
             .padding(.horizontal, 16)
 

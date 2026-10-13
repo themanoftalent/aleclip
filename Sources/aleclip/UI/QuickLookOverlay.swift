@@ -66,19 +66,19 @@ public struct QuickLookOverlay: View {
 
             // Footer
             HStack {
-                Text("Press Space or Esc to close")
+                Text(loc("quicklook.footerHint"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
 
                 Spacer()
 
-                Button("Copy") {
+                Button(loc("quicklook.copy")) {
                     PasteService.shared.copyToClipboard(clip)
                     onDismiss()
                 }
                 .keyboardShortcut("c", modifiers: .command)
 
-                Button("Paste into App") {
+                Button(loc("quicklook.pasteIntoApp")) {
                     onPaste()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -110,7 +110,7 @@ public struct QuickLookOverlay: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             HStack {
-                Text("\(clip.plainText.count) characters • \(clip.plainText.split { $0.isWhitespace }.count) words")
+                Text(locF("quicklook.stats", clip.plainText.count, clip.plainText.split { $0.isWhitespace }.count))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                 Spacer()
@@ -134,7 +134,7 @@ public struct QuickLookOverlay: View {
                         .foregroundColor(.secondary)
                 }
             } else {
-                Text("Image data not available")
+                Text(loc("quicklook.noImageData"))
                     .foregroundColor(.secondary)
             }
         }
@@ -152,7 +152,7 @@ public struct QuickLookOverlay: View {
                 Text(clip.colorHex ?? "#000000")
                     .font(.system(size: 24, weight: .bold, design: .monospaced))
 
-                Button("Copy Hex Code") {
+                Button(loc("quicklook.copyHex")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(clip.colorHex ?? "", forType: .string)
                 }
@@ -175,7 +175,7 @@ public struct QuickLookOverlay: View {
                 .padding(.horizontal)
 
             if let urlString = clip.url, let url = URL(string: urlString) {
-                Button("Open in Default Browser") {
+                Button(loc("quicklook.openBrowser")) {
                     NSWorkspace.shared.open(url)
                     onDismiss()
                 }
@@ -202,7 +202,7 @@ public struct QuickLookOverlay: View {
                 .padding(.horizontal)
 
             if let urlString = clip.url, let fileURL = URL(string: urlString) {
-                Button("Reveal in Finder") {
+                Button(loc("quicklook.revealFinder")) {
                     NSWorkspace.shared.activateFileViewerSelecting([fileURL])
                     onDismiss()
                 }

@@ -55,6 +55,18 @@ public final class FloatingPanelController: ObservableObject {
 
         public var id: String { rawValue }
 
+        public var title: String {
+            switch self {
+            case .all: return loc("filter.all")
+            case .pinned: return loc("filter.pinned")
+            case .text: return loc("filter.text")
+            case .links: return loc("filter.links")
+            case .images: return loc("filter.images")
+            case .files: return loc("filter.files")
+            case .colors: return loc("filter.colors")
+            }
+        }
+
         public var iconName: String {
             switch self {
             case .all: return "square.stack.3d.up"

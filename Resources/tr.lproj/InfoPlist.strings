@@ -1,0 +1,6 @@
+/* InfoPlist.strings (Türkçe) */
+
+"CFBundleDisplayName" = "AleClip";
+"CFBundleName" = "AleClip";
+"NSHumanReadableCopyright" = "© 2026 SoftAI Yazılım";
+"NSAccessibilityUsageDescription" = "AleClip, aktif uygulamalarınıza yapıştırma tuş vuruşlarını iletmek için Erişilebilirlik erişimine ihtiyaç duyar.";

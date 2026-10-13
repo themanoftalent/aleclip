@@ -30,23 +30,23 @@ public struct EditClipSheet: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Edit Clip")
+                Text(loc("edit.title"))
                     .font(.headline)
                 Spacer()
-                Button("Cancel", action: onCancel)
+                Button(loc("edit.cancel"), action: onCancel)
                     .keyboardShortcut(.cancelAction)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Custom Title (Optional)")
+                Text(loc("edit.customTitle"))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                TextField("Clip title...", text: $model.title)
+                TextField(loc("edit.titlePlaceholder"), text: $model.title)
                     .textFieldStyle(.roundedBorder)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Content")
+                Text(loc("edit.content"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 TextEditor(text: $model.content)
@@ -60,7 +60,7 @@ public struct EditClipSheet: View {
 
             HStack {
                 Spacer()
-                Button("Save Changes") {
+                Button(loc("edit.save")) {
                     onSave(model.title, model.content)
                 }
                 .buttonStyle(.borderedProminent)

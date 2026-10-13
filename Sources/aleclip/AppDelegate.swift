@@ -34,4 +34,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         FloatingPanelController.shared.show()
         return true
     }
+
+    public func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme?.lowercased() == "aleclip" else { continue }
+            switch url.host?.lowercased() {
+            case "toggle":
+                FloatingPanelController.shared.toggle()
+            case "show":
+                FloatingPanelController.shared.show()
+            case "settings":
+                MenuBarController.shared.openSettingsAction()
+            case "about":
+                MenuBarController.shared.openAboutAction()
+            default:
+                FloatingPanelController.shared.toggle()
+            }
+        }
+    }
 }

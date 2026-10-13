@@ -12,13 +12,13 @@ public enum ClipType: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .text: return "Text"
-        case .richText: return "Rich Text"
+        case .text: return loc("filter.text")
+        case .richText: return loc("filter.text")
         case .html: return "HTML"
-        case .image: return "Image"
-        case .link: return "Link"
-        case .file: return "File"
-        case .color: return "Color"
+        case .image: return loc("filter.images")
+        case .link: return loc("filter.links")
+        case .file: return loc("filter.files")
+        case .color: return loc("filter.colors")
         }
     }
 
@@ -114,13 +114,13 @@ public struct ClipItem: Identifiable, Codable, Sendable, Equatable {
     }
 
     public func matches(query: String) -> Bool {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return true }
-        if let title = title, title.lowercased().contains(trimmed) { return true }
-        if plainText.lowercased().contains(trimmed) { return true }
-        if let url = url, url.lowercased().contains(trimmed) { return true }
-        if let colorHex = colorHex, colorHex.lowercased().contains(trimmed) { return true }
-        if let appName = sourceAppName, appName.lowercased().contains(trimmed) { return true }
+        if let title = title, title.localizedStandardContains(trimmed) { return true }
+        if plainText.localizedStandardContains(trimmed) { return true }
+        if let url = url, url.localizedStandardContains(trimmed) { return true }
+        if let colorHex = colorHex, colorHex.localizedStandardContains(trimmed) { return true }
+        if let appName = sourceAppName, appName.localizedStandardContains(trimmed) { return true }
         return false
     }
 }

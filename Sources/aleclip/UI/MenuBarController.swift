@@ -37,7 +37,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 1. About AleClip
         let aboutItem = NSMenuItem(
-            title: "About AleClip",
+            title: loc("menu.about"),
             action: #selector(openAboutAction),
             keyEquivalent: ""
         )
@@ -46,7 +46,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 2. Check for Updates...
         let updateItem = NSMenuItem(
-            title: "Check for Updates…",
+            title: loc("menu.updates"),
             action: #selector(checkForUpdatesAction),
             keyEquivalent: ""
         )
@@ -57,7 +57,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         // 3. Toggle Panel Item
         let openItem = NSMenuItem(
-            title: "Open Clipboard Panel",
+            title: loc("menu.openPanel"),
             action: #selector(openPanelAction),
             keyEquivalent: "v"
         )
@@ -67,8 +67,8 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // 2. Recent Clips Header
-        let recentHeader = NSMenuItem(title: "Recent Clips", action: nil, keyEquivalent: "")
+        // 4. Recent Clips Header
+        let recentHeader = NSMenuItem(title: loc("menu.recentClips"), action: nil, keyEquivalent: "")
         recentHeader.isEnabled = false
         menu.addItem(recentHeader)
 
@@ -76,7 +76,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         let recentClips = clips.prefix(7)
 
         if recentClips.isEmpty {
-            let emptyItem = NSMenuItem(title: "  (No clips yet)", action: nil, keyEquivalent: "")
+            let emptyItem = NSMenuItem(title: loc("menu.noClips"), action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             menu.addItem(emptyItem)
         } else {
@@ -98,18 +98,18 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // 3. Clear unpinned
+        // 5. Clear unpinned
         let clearItem = NSMenuItem(
-            title: "Clear Unpinned History",
+            title: loc("menu.clearUnpinned"),
             action: #selector(clearHistoryAction),
             keyEquivalent: ""
         )
         clearItem.target = self
         menu.addItem(clearItem)
 
-        // 4. Preferences / Settings
+        // 6. Preferences / Settings
         let settingsItem = NSMenuItem(
-            title: "Settings...",
+            title: loc("menu.settings"),
             action: #selector(openSettingsAction),
             keyEquivalent: ","
         )
@@ -118,9 +118,9 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // 5. Quit
+        // 7. Quit
         let quitItem = NSMenuItem(
-            title: "Quit AleClip",
+            title: loc("menu.quit"),
             action: #selector(quitAction),
             keyEquivalent: "q"
         )
@@ -149,11 +149,13 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "About AleClip"
+            window.title = loc("about.title")
             window.center()
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: AboutView())
             self.aboutWindow = window
+        } else {
+            aboutWindow?.title = loc("about.title")
         }
 
         aboutWindow?.center()
@@ -181,11 +183,13 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 backing: .buffered,
                 defer: false
             )
-            window.title = "AleClip Settings"
+            window.title = loc("settings.title")
             window.center()
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: SettingsView())
             self.settingsWindow = window
+        } else {
+            settingsWindow?.title = loc("settings.title")
         }
 
         settingsWindow?.center()

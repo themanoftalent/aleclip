@@ -197,7 +197,7 @@ public struct ClipboardBarView: View {
                     .foregroundColor(.secondary)
                     .font(.system(size: 13))
 
-                TextField("Search clips...", text: $controller.searchText)
+                TextField(loc("panel.searchPlaceholder"), text: $controller.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .onReceive(NotificationCenter.default.publisher(for: NSControl.textDidBeginEditingNotification)) { _ in
@@ -222,7 +222,7 @@ public struct ClipboardBarView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color(nsColor: .controlBackgroundColor).opacity(0.8))
             )
-            .frame(width: 220)
+            .frame(width: 200)
 
             // Filter Tabs
             HStack(spacing: 4) {
@@ -234,7 +234,7 @@ public struct ClipboardBarView: View {
                         HStack(spacing: 4) {
                             Image(systemName: tab.iconName)
                                 .font(.system(size: 10))
-                            Text(tab.rawValue)
+                            Text(tab.title)
                                 .font(.system(size: 11, weight: controller.selectedFilter == tab ? .semibold : .regular))
                         }
                         .padding(.horizontal, 8)
@@ -261,7 +261,7 @@ public struct ClipboardBarView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help("AleClip Settings (⌘,)")
+            .help(loc("menu.settings"))
 
             // Clear unpinned button
             Button(action: {
@@ -273,7 +273,7 @@ public struct ClipboardBarView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Clear Unpinned History")
+            .help(loc("menu.clearUnpinned"))
         }
         .padding(.horizontal, 16)
     }
@@ -282,17 +282,17 @@ public struct ClipboardBarView: View {
 
     private func footerBar(itemsCount: Int) -> some View {
         HStack {
-            Text("\(itemsCount) \(itemsCount == 1 ? "clip" : "clips")")
+            Text("\(itemsCount) \(loc(itemsCount == 1 ? "footer.clip" : "footer.clips"))")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.secondary)
 
             Spacer()
 
             HStack(spacing: 12) {
-                keyTip(key: "← →", desc: "Navigate")
-                keyTip(key: "↵", desc: "Paste")
-                keyTip(key: "Space", desc: "Preview")
-                keyTip(key: "Esc", desc: "Close")
+                keyTip(key: "← →", desc: loc("footer.navigate"))
+                keyTip(key: "↵", desc: loc("footer.paste"))
+                keyTip(key: "Space", desc: loc("footer.preview"))
+                keyTip(key: "Esc", desc: loc("footer.close"))
 
                 Button(action: {
                     controller.showShortcutsPopover.toggle()
@@ -302,7 +302,7 @@ public struct ClipboardBarView: View {
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Keyboard Shortcuts Guide")
+                .help(loc("settings.shortcuts.guideTitle"))
                 .popover(isPresented: $controller.showShortcutsPopover, arrowEdge: .top) {
                     shortcutsPopoverView
                 }
@@ -330,26 +330,26 @@ public struct ClipboardBarView: View {
                 Image(systemName: "keyboard")
                     .foregroundColor(.accentColor)
                     .font(.system(size: 12, weight: .semibold))
-                Text("Keyboard Shortcuts")
+                Text(loc("settings.shortcuts.guideTitle"))
                     .font(.system(size: 12, weight: .bold))
             }
 
             Divider()
 
             VStack(spacing: 6) {
-                popoverShortcutRow(keys: ["⌥", "V"], action: "Open / Dismiss panel")
-                popoverShortcutRow(keys: ["←", "→"], action: "Navigate clips")
-                popoverShortcutRow(keys: ["↵"], action: "Paste into active app")
-                popoverShortcutRow(keys: ["⇧", "↵"], action: "Paste as plain text")
-                popoverShortcutRow(keys: ["Space"], action: "Quick Look preview")
-                popoverShortcutRow(keys: ["⌘", "E"], action: "Edit text clip")
-                popoverShortcutRow(keys: ["⌫"], action: "Delete clip")
-                popoverShortcutRow(keys: ["⌘", ","], action: "Open Settings")
-                popoverShortcutRow(keys: ["Esc"], action: "Close panel")
+                popoverShortcutRow(keys: ["⌥", "V"], action: loc("settings.shortcuts.togglePanel"))
+                popoverShortcutRow(keys: ["←", "→"], action: loc("settings.shortcuts.navigateCards"))
+                popoverShortcutRow(keys: ["↵"], action: loc("settings.shortcuts.pasteClip"))
+                popoverShortcutRow(keys: ["⇧", "↵"], action: loc("settings.shortcuts.plainPaste"))
+                popoverShortcutRow(keys: ["Space"], action: loc("settings.shortcuts.quickLook"))
+                popoverShortcutRow(keys: ["⌘", "E"], action: loc("settings.shortcuts.editClip"))
+                popoverShortcutRow(keys: ["⌫"], action: loc("settings.shortcuts.deleteClip"))
+                popoverShortcutRow(keys: ["⌘", ","], action: loc("settings.shortcuts.openSettings"))
+                popoverShortcutRow(keys: ["Esc"], action: loc("settings.shortcuts.dismissPanel"))
             }
         }
         .padding(12)
-        .frame(width: 240)
+        .frame(width: 250)
     }
 
     private func popoverShortcutRow(keys: [String], action: String) -> some View {
@@ -387,7 +387,7 @@ public struct ClipboardBarView: View {
                 .font(.system(size: 28))
                 .foregroundColor(.secondary.opacity(0.7))
 
-            Text(controller.searchText.isEmpty ? "No clips yet. Copy something to start." : "No clips match your search.")
+            Text(controller.searchText.isEmpty ? loc("empty.noClips") : loc("empty.noMatch"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
         }
