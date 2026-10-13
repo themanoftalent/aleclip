@@ -47,6 +47,19 @@ public final class StorageService: ObservableObject {
 
     // MARK: - History Operations
 
+    private var saveDebounceWorkItem: DispatchWorkItem?
+
+    public func scheduleSaveHistory() {
+        saveDebounceWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.saveHistory()
+            }
+        }
+        saveDebounceWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem)
+    }
+
     public func addClip(_ clip: ClipItem) {
         // Check for deduplication
         if let existingIndex = clips.firstIndex(where: { $0.contentHash == clip.contentHash }) {
@@ -59,26 +72,26 @@ public final class StorageService: ObservableObject {
         }
 
         pruneHistoryIfNeeded()
-        saveHistory()
+        scheduleSaveHistory()
     }
 
     public func togglePin(for clipId: UUID) {
         guard let index = clips.firstIndex(where: { $0.id == clipId }) else { return }
         clips[index].isPinned.toggle()
-        saveHistory()
+        scheduleSaveHistory()
     }
 
     public func renameClip(id: UUID, newTitle: String) {
         guard let index = clips.firstIndex(where: { $0.id == id }) else { return }
         clips[index].title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newTitle
-        saveHistory()
+        scheduleSaveHistory()
     }
 
     public func updatePlainText(id: UUID, newText: String) {
         guard let index = clips.firstIndex(where: { $0.id == id }) else { return }
         clips[index].plainText = newText
         clips[index].lastUsedAt = Date()
-        saveHistory()
+        scheduleSaveHistory()
     }
 
     public func deleteClip(id: UUID) {
@@ -87,7 +100,7 @@ public final class StorageService: ObservableObject {
         if let imageFileName = removed.imageFileName {
             deleteBlob(named: imageFileName)
         }
-        saveHistory()
+        scheduleSaveHistory()
     }
 
     public func clearUnpinned() {
@@ -169,7 +182,11 @@ public final class StorageService: ObservableObject {
             decoder.dateDecodingStrategy = .iso8601
             self.clips = try decoder.decode([ClipItem].self, from: data)
         } catch {
-            print("Failed to load history: \(error)")
+            print("Failed to load history: \(error). Preserving corrupted file backup.")
+            let timestamp = Int(Date().timeIntervalSince1970)
+            let backupURL = appSupportURL.appendingPathComponent("history.corrupt.\(timestamp).bak")
+            try? fileManager.copyItem(at: historyFileURL, to: backupURL)
+            self.clips = []
         }
     }
 

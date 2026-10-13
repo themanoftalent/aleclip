@@ -520,7 +520,7 @@ public struct SettingsView: View {
             VStack(spacing: 3) {
                 Text("AleClip")
                     .font(.system(size: 22, weight: .bold))
-                Text(locF("about.version", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))
+                Text(locF("about.version", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.0", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "2"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

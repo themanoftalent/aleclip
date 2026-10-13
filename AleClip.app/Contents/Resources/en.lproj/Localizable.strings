@@ -91,6 +91,7 @@
 "settings.shortcuts.togglePanel" = "Open / Dismiss AleClip bottom panel";
 "settings.shortcuts.navigateCards" = "Navigate between clipboard cards";
 "settings.shortcuts.pasteClip" = "Paste selected clip into frontmost app";
+"settings.shortcuts.quickPaste" = "Quick paste card 1 to 9 directly";
 "settings.shortcuts.plainPaste" = "Paste clip as unformatted plain text";
 "settings.shortcuts.quickLook" = "Quick Look preview (text, images, links, files, colors)";
 "settings.shortcuts.editClip" = "Edit text clip content or assign custom title";

@@ -91,6 +91,7 @@
 "settings.shortcuts.togglePanel" = "AleClip alt panelini Aç / Kapat";
 "settings.shortcuts.navigateCards" = "Pano kartları arasında gezin";
 "settings.shortcuts.pasteClip" = "Seçilen kaydı ön plandaki uygulamaya yapıştır";
+"settings.shortcuts.quickPaste" = "1'den 9'a kadar olan kartı doğrudan yapıştır";
 "settings.shortcuts.plainPaste" = "Kaydı biçimlendirilmemiş düz metin olarak yapıştır";
 "settings.shortcuts.quickLook" = "Hızlı Bakış önizlemesi (metin, görsel, bağlantı, dosya, renk)";
 "settings.shortcuts.editClip" = "Metin içeriğini düzenle veya özel başlık ata";

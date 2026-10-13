@@ -81,6 +81,10 @@ public final class PasteService {
     public func pasteClip(_ clip: ClipItem, targetApp: NSRunningApplication?, forcePlainText: Bool = false) {
         copyToClipboard(clip, forcePlainText: forcePlainText)
 
+        if StorageService.shared.settings.soundEffects {
+            NSSound(named: "Pop")?.play()
+        }
+
         guard StorageService.shared.settings.pasteIntoActiveApp else { return }
 
         // If target app is provided, activate it first

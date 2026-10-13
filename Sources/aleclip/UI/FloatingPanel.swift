@@ -43,6 +43,8 @@ public final class FloatingPanelController: ObservableObject {
     public private(set) var previousApp: NSRunningApplication?
     private var panel: FloatingPanel?
     private var localKeyMonitor: Any?
+    private var globalClickMonitor: Any?
+    private var resignObserver: NSObjectProtocol?
 
     public enum FilterTab: String, CaseIterable, Identifiable {
         case all = "All"
@@ -120,8 +122,10 @@ public final class FloatingPanelController: ObservableObject {
         self.editingClip = nil
         self.showShortcutsPopover = false
 
-        // Position at bottom center of screen
-        if let screen = NSScreen.main {
+        // Position at bottom center of screen where mouse currently is
+        let mouseLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
+        if let screen = targetScreen {
             let screenRect = screen.visibleFrame
             let x = screenRect.midX - (panel.frame.width / 2.0)
             let y = screenRect.minY + 24 // 24px above dock / bottom edge
@@ -139,12 +143,14 @@ public final class FloatingPanelController: ObservableObject {
 
         isVisible = true
         startKeyboardMonitoring()
+        startDismissMonitoring()
     }
 
     public func hide() {
         guard let panel = panel, isVisible else { return }
 
         stopKeyboardMonitoring()
+        stopDismissMonitoring()
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.12
@@ -156,6 +162,47 @@ public final class FloatingPanelController: ObservableObject {
                 self?.showShortcutsPopover = false
             }
         })
+    }
+
+    // MARK: - Dismiss Monitoring (Outside clicks & app switching)
+
+    private func startDismissMonitoring() {
+        stopDismissMonitoring()
+
+        // 1. Outside click monitor (clicks on other apps or desktop)
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isVisible else { return }
+                self.hide()
+            }
+        }
+
+        // 2. Resign key notification (app switching via Command-Tab, clicking menubar, etc.)
+        if let panel = self.panel {
+            resignObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: panel,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self = self, self.isVisible else { return }
+                    if !self.showShortcutsPopover && self.previewClip == nil && self.editingClip == nil {
+                        self.hide()
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopDismissMonitoring() {
+        if let monitor = globalClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalClickMonitor = nil
+        }
+        if let observer = resignObserver {
+            NotificationCenter.default.removeObserver(observer)
+            resignObserver = nil
+        }
     }
 
     // MARK: - Keyboard Event Monitoring
@@ -181,6 +228,21 @@ public final class FloatingPanelController: ObservableObject {
                     return nil
                 }
                 return event
+            }
+
+            // ⌘1 through ⌘9 Quick Paste
+            if event.modifierFlags.contains(.command),
+               let chars = event.charactersIgnoringModifiers,
+               let firstChar = chars.first,
+               let num = Int(String(firstChar)),
+               (1...9).contains(num) {
+                let index = num - 1
+                let items = self.filteredClips()
+                if index < items.count {
+                    self.selectedIndex = index
+                    self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
+                    return nil
+                }
             }
 
             switch event.keyCode {

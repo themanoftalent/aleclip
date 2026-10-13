@@ -24,11 +24,13 @@ public final class ClipboardMonitor: ObservableObject {
     public func start() {
         guard timer == nil else { return }
         lastChangeCount = NSPasteboard.general.changeCount
-        timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkForChanges()
             }
         }
+        RunLoop.main.add(t, forMode: .common)
+        self.timer = t
     }
 
     public func stop() {
@@ -75,6 +77,9 @@ public final class ClipboardMonitor: ObservableObject {
         // 3. Extract clip according to type priority
         if let clip = extractClip(from: pasteboard, bundleId: bundleId, appName: appName) {
             StorageService.shared.addClip(clip)
+            if StorageService.shared.settings.soundEffects {
+                NSSound(named: "Tink")?.play()
+            }
         }
     }
 
@@ -184,6 +189,15 @@ public final class ClipboardMonitor: ObservableObject {
             let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
 
+            // Guard against giant text payloads (e.g. 50MB dumps) freezing the UI
+            let maxCharacters = 250_000
+            let safeString: String
+            if string.count > maxCharacters {
+                safeString = String(string.prefix(maxCharacters)) + "\n\n[... Truncated for performance / Performans için kesildi ...]"
+            } else {
+                safeString = string
+            }
+
             // Check if string is actually a URL
             if (trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")),
                let _ = URL(string: trimmed) {
@@ -198,10 +212,10 @@ public final class ClipboardMonitor: ObservableObject {
                 )
             }
 
-            let hash = hashString("text:\(string)")
+            let hash = hashString("text:\(safeString)")
             return ClipItem(
                 type: .text,
-                plainText: string,
+                plainText: safeString,
                 sourceAppBundleId: bundleId,
                 sourceAppName: appName,
                 contentHash: hash

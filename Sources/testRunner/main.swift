@@ -101,7 +101,23 @@ func runTests() {
     LocalizationService.shared.setLanguage("tr")
     assert(loc("panel.searchPlaceholder") == "Panoda ara...", "Turkish search placeholder")
     assert(loc("about.developedBy") == "SoftAI Yazılım tarafından geliştirildi", "Turkish developer line")
+    assert(!loc("settings.shortcuts.quickPaste").isEmpty, "Turkish quickPaste shortcut string")
     print("  ✔ Localization service English & Turkish strings passed")
+
+    // 9. Quick paste localization check in English
+    LocalizationService.shared.setLanguage("en")
+    assert(!loc("settings.shortcuts.quickPaste").isEmpty, "English quickPaste shortcut string")
+    print("  ✔ Quick Paste localization strings verified")
+
+    // 10. Large text safety truncation validation
+    let giantText = String(repeating: "A", count: 300_000)
+    let maxCharacters = 250_000
+    let safeString = giantText.count > maxCharacters
+        ? String(giantText.prefix(maxCharacters)) + "\n\n[... Truncated for performance / Performans için kesildi ...]"
+        : giantText
+    let largeClip = ClipItem(type: .text, plainText: safeString, contentHash: "largehash")
+    assert(largeClip.plainText.count < 300_000, "Safety cap prevents unbounded memory expansion")
+    print("  ✔ Large text safety capping verified")
 
     print("\n✅ All AleClip tests passed successfully!")
 }

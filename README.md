@@ -35,9 +35,17 @@
 
 ---
 
-## ✨ Features
+## ✨ Features (v2.0.0)
 
 - **Non-Activating Floating Panel**: Slides up smoothly from the bottom of your screen using `⌥V` (or your chosen shortcut) without stealing window focus from your active apps.
+- **Smart Multi-Monitor Detection**: Automatically identifies which screen your mouse cursor is on and positions the panel on that display.
+- **Click-Away Auto-Dismiss**: Seamlessly dismisses the panel if you click outside on desktop/other windows or switch apps.
+- **Direct Quick Paste (`⌘1`–`⌘9`)**: Instantly paste any of the first 9 cards directly into the active app with a single keystroke.
+- **RunLoop Common Mode Polling**: Polling timer runs on `.common` RunLoop mode to ensure copies during window dragging, scrolling, or menu tracking are never dropped.
+- **Large Clip Safety Protection**: Safely caps massive text dumps at 250,000 characters to prevent SwiftUI main-thread UI freezing.
+- **SSD Write Debouncing**: Groups rapid consecutive copies with a 0.4s debounce, preserving SSD write cycles and MacBook battery life.
+- **Automatic Corrupt File Recovery**: Safely archives any corrupt history files to `.bak` backups rather than discarding clipboard history.
+- **Native Audio Feedback**: Plays subtle macOS system audio (`Tink` on copy, `Pop` on paste) when sound effects are enabled.
 - **Subtle Background Watermark**: Clean, unobtrusive `"ALE"` watermark rendered on the panel background layer.
 - **Multi-Type Clipboard Support**:
   - Plain Text & Rich Text (RTF)
@@ -50,7 +58,7 @@
 - **Direct Paste (`↵`)**: Synthesizes `⌘V` directly into your frontmost application using native macOS Quartz Event Services.
 - **Plain Text Paste (`⇧↵`)**: Strips formatting and pastes pure unformatted text on the fly.
 - **Card-Based Settings Window (`⌘,`)**:
-  - **General**: Configurable history limits (50–1000 items), direct paste toggles, accessibility status checks, sound effects.
+  - **General**: Configurable history limits (50–1000 items), direct paste toggles, accessibility status checks, sound effects, and Language picker (System / English / Türkçe).
   - **Shortcuts**: Configurable global hotkey (`⌥V`, `⌘⇧V`, `⌃⌥V`, `⌥Space`) and built-in shortcuts guide.
   - **Exclusions**: Block sensitive apps (1Password, Bitwarden, Keychain, etc.) from being recorded, with an interactive macOS app picker.
   - **Backup & Restore**: Export history to a standard `.json` file, restore with automatic deduplication, or prune unpinned items.
@@ -68,6 +76,7 @@
 | `⌥V` | **Toggle Panel** (Open / Dismiss AleClip bottom panel) |
 | `←` `→` | **Navigate** between clipboard cards |
 | `↵` (Return) | **Paste** selected clip into active application |
+| `⌘1`–`⌘9` | **Quick Paste** card 1 to 9 directly into active application |
 | `⇧↵` (Shift+Return) | **Paste as Plain Text** (strips rich text / HTML styling) |
 | `Space` | **Quick Look Preview** (fullscreen card inspection) |
 | `⌘E` | **Edit Clip** (modify text content or assign custom title) |

@@ -7,6 +7,7 @@ final class HoverViewModel: ObservableObject {
 
 public struct ClipCardView: View {
     public let clip: ClipItem
+    public let shortcutNumber: Int?
     public let isSelected: Bool
     public let onSelect: () -> Void
     public let onPaste: () -> Void
@@ -14,6 +15,28 @@ public struct ClipCardView: View {
     public let onDelete: () -> Void
     public let onQuickLook: () -> Void
     public let onEdit: () -> Void
+
+    public init(
+        clip: ClipItem,
+        shortcutNumber: Int? = nil,
+        isSelected: Bool,
+        onSelect: @escaping () -> Void,
+        onPaste: @escaping () -> Void,
+        onTogglePin: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        onQuickLook: @escaping () -> Void,
+        onEdit: @escaping () -> Void
+    ) {
+        self.clip = clip
+        self.shortcutNumber = shortcutNumber
+        self.isSelected = isSelected
+        self.onSelect = onSelect
+        self.onPaste = onPaste
+        self.onTogglePin = onTogglePin
+        self.onDelete = onDelete
+        self.onQuickLook = onQuickLook
+        self.onEdit = onEdit
+    }
 
     @StateObject private var hoverModel = HoverViewModel()
     @Environment(\.colorScheme) private var colorScheme
@@ -31,6 +54,18 @@ public struct ClipCardView: View {
                 Text(clip.type.displayName)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.primary.opacity(0.85))
+
+                if let num = shortcutNumber {
+                    Text("⌘\(num)")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 3.5)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.08))
+                        )
+                        .foregroundColor(isSelected ? .accentColor : .secondary)
+                }
 
                 if clip.isPinned {
                     HStack(spacing: 2) {

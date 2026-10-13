@@ -48,6 +48,7 @@ public struct ClipboardBarView: View {
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, clip in
                                     ClipCardView(
                                         clip: clip,
+                                        shortcutNumber: index < 9 ? (index + 1) : nil,
                                         isSelected: index == controller.selectedIndex,
                                         onSelect: {
                                             controller.selectedIndex = index
@@ -340,6 +341,7 @@ public struct ClipboardBarView: View {
                 popoverShortcutRow(keys: ["⌥", "V"], action: loc("settings.shortcuts.togglePanel"))
                 popoverShortcutRow(keys: ["←", "→"], action: loc("settings.shortcuts.navigateCards"))
                 popoverShortcutRow(keys: ["↵"], action: loc("settings.shortcuts.pasteClip"))
+                popoverShortcutRow(keys: ["⌘", "1...9"], action: loc("settings.shortcuts.quickPaste"))
                 popoverShortcutRow(keys: ["⇧", "↵"], action: loc("settings.shortcuts.plainPaste"))
                 popoverShortcutRow(keys: ["Space"], action: loc("settings.shortcuts.quickLook"))
                 popoverShortcutRow(keys: ["⌘", "E"], action: loc("settings.shortcuts.editClip"))
