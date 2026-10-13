@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    
+    <!-- Assembly Metadata -->
+    <AssemblyName>AleClip</AssemblyName>
+    <RootNamespace>AleClip</RootNamespace>
+    <AssemblyTitle>AleClip</AssemblyTitle>
+    <Product>AleClip</Product>
+    <Company>SoftAI Yazılım</Company>
+    <Authors>Mehmet Akif Çifçi</Authors>
+    <Copyright>© 2026 SoftAI Yazılım</Copyright>
+    <Description>A modern, lightweight native clipboard manager for Windows by SoftAI Yazılım</Description>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+
+    <!-- Single file publish optimizations -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
+    <EmbeddedResource Include="Resources\Strings.en.json" />
+    <EmbeddedResource Include="Resources\Strings.tr.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+</Project>

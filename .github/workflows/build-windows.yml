@@ -1,0 +1,58 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [ master ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore windows/AleClip/AleClip.csproj
+
+      - name: Publish Self-Contained Single-File Executable
+        run: >
+          dotnet publish windows/AleClip/AleClip.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -o ./publish/windows
+
+      - name: Create Windows ZIP Archive
+        run: |
+          Compress-Archive -Path ./publish/windows/AleClip.exe -DestinationPath ./publish/AleClip-Windows-x64.zip
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AleClip-Windows-x64
+          path: ./publish/windows/AleClip.exe
+
+      - name: Attach Windows Executable to GitHub Release
+        if: github.event_name == 'release' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          files: |
+            ./publish/windows/AleClip.exe
+            ./publish/AleClip-Windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
