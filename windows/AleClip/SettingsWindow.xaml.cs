@@ -3,6 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using AleClip.Services;
 using Microsoft.Win32;
+using MessageBox = System.Windows.MessageBox;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace AleClip;
 

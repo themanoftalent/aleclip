@@ -9,6 +9,8 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Interop;
 using AleClip.Models;
+using TextDataFormat = System.Windows.TextDataFormat;
+using Clipboard = System.Windows.Clipboard;
 
 namespace AleClip.Services;
 

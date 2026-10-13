@@ -3,6 +3,9 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using AleClip.Models;
+using DataObject = System.Windows.DataObject;
+using TextDataFormat = System.Windows.TextDataFormat;
+using Clipboard = System.Windows.Clipboard;
 
 namespace AleClip.Services;
 
