@@ -449,14 +449,14 @@ public struct SettingsView: View {
     // MARK: - About Content
 
     private var aboutContent: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 10)
+        VStack(spacing: 14) {
+            Spacer().frame(height: 6)
 
             if let image = NSApp.applicationIconImage {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 88, height: 88)
+                    .frame(width: 84, height: 84)
                     .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
             } else {
                 Image(systemName: "paperclip")
@@ -464,7 +464,7 @@ public struct SettingsView: View {
                     .foregroundColor(.accentColor)
             }
 
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 Text("AleClip")
                     .font(.system(size: 22, weight: .bold))
                 Text("Version 1.0.0 (Build 1)")
@@ -472,17 +472,87 @@ public struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
+            // Developer Credit
+            HStack(spacing: 5) {
+                Text("Developed by")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                Text("Mehmet Akif Çifçi")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+
             Text("A modern, lightweight native clipboard manager for macOS with card history, Quick Look, and non-activating bottom panel.")
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
+                .frame(maxWidth: 440)
 
-            Divider().frame(width: 320)
+            // Philosophy & Highlights
+            HStack(spacing: 8) {
+                HStack(spacing: 5) {
+                    Image(systemName: "hand.raised.slash.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 11))
+                    Text("Zero Data Collection")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+
+                HStack(spacing: 5) {
+                    Image(systemName: "gift.fill")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 11))
+                    Text("100% Free for Everyone")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundColor(.orange)
+                        .font(.system(size: 11))
+                    Text("Free to Fork & Customize")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                )
+            }
+
+            Divider().frame(width: 360)
 
             VStack(spacing: 4) {
                 Text("\(storage.clips.count) clips in history • \(storage.clips.filter { $0.isPinned }.count) pinned")
                     .font(.caption.bold())
+                Text("All clipboard content is stored strictly locally on your Mac. No network telemetry.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                 Text("Built natively with Swift 6, AppKit, and SwiftUI.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
