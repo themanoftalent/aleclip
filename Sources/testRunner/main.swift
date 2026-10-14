@@ -119,6 +119,62 @@ func runTests() {
     assert(largeClip.plainText.count < 300_000, "Safety cap prevents unbounded memory expansion")
     print("  ✔ Large text safety capping verified")
 
+    // 11. Soft delete and undoLastDelete (⌘Z)
+    let undoTestClip = ClipItem(type: .text, plainText: "Important user note that was deleted", contentHash: "undohash1")
+    storage.addClip(undoTestClip)
+    assert(storage.clips.contains { $0.id == undoTestClip.id }, "Clip should be in active clips")
+
+    let deletedItem = storage.deleteClip(id: undoTestClip.id)
+    assert(deletedItem?.id == undoTestClip.id, "deleteClip should return deleted clip")
+    assert(!storage.clips.contains { $0.id == undoTestClip.id }, "Clip should no longer be in active clips")
+    assert(storage.deletedClips.contains { $0.id == undoTestClip.id }, "Clip should be stored in deletedClips (Trash)")
+
+    let restoredItem = storage.undoLastDelete()
+    assert(restoredItem?.id == undoTestClip.id, "undoLastDelete should return restored clip")
+    assert(storage.clips.contains { $0.id == undoTestClip.id }, "Restored clip must be back in active clips")
+    assert(!storage.deletedClips.contains { $0.id == undoTestClip.id }, "Restored clip must be removed from deletedClips")
+    print("  ✔ Soft delete and undoLastDelete (⌘Z) passed")
+
+    // 12. Restore from Trash (deletedClips)
+    let trashTestClip = ClipItem(type: .text, plainText: "Clip to restore from Trash bin", contentHash: "trashhash1")
+    storage.addClip(trashTestClip)
+    storage.deleteClip(id: trashTestClip.id)
+    assert(storage.deletedClips.contains { $0.id == trashTestClip.id }, "Clip must be in Trash")
+
+    let manuallyRestored = storage.restoreClip(id: trashTestClip.id)
+    assert(manuallyRestored?.id == trashTestClip.id, "restoreClip should return the clip")
+    assert(storage.clips.contains { $0.id == trashTestClip.id }, "Clip should be restored to active clips")
+    assert(!storage.deletedClips.contains { $0.id == trashTestClip.id }, "Clip should be removed from Trash")
+    print("  ✔ Restore from Trash (deletedClips) passed")
+
+    // 13. Permanent delete & Empty Trash
+    let permClip1 = ClipItem(type: .text, plainText: "Permanent 1", contentHash: "perm1")
+    let permClip2 = ClipItem(type: .text, plainText: "Permanent 2", contentHash: "perm2")
+    storage.addClip(permClip1)
+    storage.addClip(permClip2)
+    storage.deleteClip(id: permClip1.id)
+    storage.deleteClip(id: permClip2.id)
+    assert(storage.deletedClips.count >= 2, "Both clips in deletedClips")
+
+    storage.deleteClip(id: permClip1.id, permanent: true)
+    assert(!storage.deletedClips.contains { $0.id == permClip1.id }, "Permanent delete should wipe item from deletedClips")
+
+    storage.emptyTrash()
+    assert(storage.deletedClips.isEmpty, "emptyTrash should clear all deleted clips")
+    print("  ✔ Permanent delete & Empty Trash passed")
+
+    // 14. Localization validation for Undo & Trash
+    LocalizationService.shared.setLanguage("en")
+    assert(loc("filter.deleted") == "Deleted", "English Deleted filter")
+    assert(loc("toast.undo") == "Undo (⌘Z)", "English Undo toast")
+    assert(loc("card.restore") == "Restore", "English card restore")
+
+    LocalizationService.shared.setLanguage("tr")
+    assert(loc("filter.deleted") == "Silinenler", "Turkish Deleted filter")
+    assert(loc("toast.undo") == "Geri Al (⌘Z)", "Turkish Undo toast")
+    assert(loc("card.restore") == "Geri Yükle", "Turkish card restore")
+    print("  ✔ Undo & Trash localization validation passed")
+
     print("\n✅ All AleClip tests passed successfully!")
 }
 

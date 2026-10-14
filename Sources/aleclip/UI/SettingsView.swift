@@ -299,6 +299,7 @@ public struct SettingsView: View {
                     shortcutRow(keys: ["Space"], action: loc("settings.shortcuts.quickLook"))
                     shortcutRow(keys: ["⌘", "E"], action: loc("settings.shortcuts.editClip"))
                     shortcutRow(keys: ["⌫"], action: loc("settings.shortcuts.deleteClip"))
+                    shortcutRow(keys: ["⌘", "Z"], action: loc("settings.shortcuts.undoDelete"))
                     shortcutRow(keys: ["Esc"], action: loc("settings.shortcuts.dismissPanel"))
                 }
             }

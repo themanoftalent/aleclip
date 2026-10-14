@@ -39,12 +39,16 @@ public final class FloatingPanelController: ObservableObject {
     @Published public var previewClip: ClipItem? = nil
     @Published public var editingClip: ClipItem? = nil
     @Published public var showShortcutsPopover: Bool = false
+    @Published public var toastMessage: String? = nil
+    @Published public var toastActionTitle: String? = nil
+    @Published public var toastAction: (() -> Void)? = nil
 
     public private(set) var previousApp: NSRunningApplication?
     private var panel: FloatingPanel?
     private var localKeyMonitor: Any?
     private var globalClickMonitor: Any?
     private var resignObserver: NSObjectProtocol?
+    private var toastDismissWorkItem: DispatchWorkItem?
 
     public enum FilterTab: String, CaseIterable, Identifiable {
         case all = "All"
@@ -54,6 +58,7 @@ public final class FloatingPanelController: ObservableObject {
         case images = "Images"
         case files = "Files"
         case colors = "Colors"
+        case deleted = "Deleted"
 
         public var id: String { rawValue }
 
@@ -66,6 +71,7 @@ public final class FloatingPanelController: ObservableObject {
             case .images: return loc("filter.images")
             case .files: return loc("filter.files")
             case .colors: return loc("filter.colors")
+            case .deleted: return loc("filter.deleted")
             }
         }
 
@@ -78,6 +84,7 @@ public final class FloatingPanelController: ObservableObject {
             case .images: return "photo"
             case .files: return "folder"
             case .colors: return "paintpalette"
+            case .deleted: return "trash"
             }
         }
     }
@@ -121,6 +128,9 @@ public final class FloatingPanelController: ObservableObject {
         self.previewClip = nil
         self.editingClip = nil
         self.showShortcutsPopover = false
+        self.toastMessage = nil
+        self.toastActionTitle = nil
+        self.toastAction = nil
 
         // Position at bottom center of screen where mouse currently is
         let mouseLocation = NSEvent.mouseLocation
@@ -230,6 +240,13 @@ public final class FloatingPanelController: ObservableObject {
                 return event
             }
 
+            // ⌘Z Undo last deletion
+            if event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.shift) && event.keyCode == 6 /* 'Z' */ {
+                if self.undoLastDelete() {
+                    return nil
+                }
+            }
+
             // ⌘1 through ⌘9 Quick Paste
             if event.modifierFlags.contains(.command),
                let chars = event.charactersIgnoringModifiers,
@@ -240,7 +257,11 @@ public final class FloatingPanelController: ObservableObject {
                 let items = self.filteredClips()
                 if index < items.count {
                     self.selectedIndex = index
-                    self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
+                    if self.selectedFilter == .deleted {
+                        self.restoreClip(items[index])
+                    } else {
+                        self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
+                    }
                     return nil
                 }
             }
@@ -259,8 +280,16 @@ public final class FloatingPanelController: ObservableObject {
                 return nil
 
             case 36, 76: // Return / Enter
-                self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
-                return nil
+                if self.selectedFilter == .deleted {
+                    let items = self.filteredClips()
+                    if self.selectedIndex >= 0 && self.selectedIndex < items.count {
+                        self.restoreClip(items[self.selectedIndex])
+                        return nil
+                    }
+                } else {
+                    self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
+                    return nil
+                }
 
             case 49: // Space
                 if !self.isSearchFocused {
@@ -304,7 +333,39 @@ public final class FloatingPanelController: ObservableObject {
 
     public var isSearchFocused: Bool = false
 
+    public func showToast(message: String, actionTitle: String? = nil, action: (() -> Void)? = nil) {
+        toastDismissWorkItem?.cancel()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            self.toastMessage = message
+            self.toastActionTitle = actionTitle
+            self.toastAction = action
+        }
+
+        let item = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.dismissToast()
+            }
+        }
+        toastDismissWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: item)
+    }
+
+    public func dismissToast() {
+        toastDismissWorkItem?.cancel()
+        toastDismissWorkItem = nil
+        withAnimation(.easeOut(duration: 0.2)) {
+            self.toastMessage = nil
+            self.toastActionTitle = nil
+            self.toastAction = nil
+        }
+    }
+
     public func filteredClips() -> [ClipItem] {
+        if selectedFilter == .deleted {
+            let deleted = StorageService.shared.deletedClips
+            return deleted.filter { $0.matches(query: searchText) }
+        }
+
         let allClips = StorageService.shared.clips
         return allClips.filter { clip in
             // Filter by Tab
@@ -323,6 +384,8 @@ public final class FloatingPanelController: ObservableObject {
                 if clip.type != .file { return false }
             case .colors:
                 if clip.type != .color { return false }
+            case .deleted:
+                return false
             }
 
             // Filter by search query
@@ -361,9 +424,59 @@ public final class FloatingPanelController: ObservableObject {
         let items = filteredClips()
         guard selectedIndex >= 0 && selectedIndex < items.count else { return }
         let toDelete = items[selectedIndex]
-        StorageService.shared.deleteClip(id: toDelete.id)
-        if selectedIndex >= filteredClips().count {
-            selectedIndex = max(0, filteredClips().count - 1)
+        deleteClip(toDelete)
+    }
+
+    public func deleteClip(_ clip: ClipItem) {
+        if selectedFilter == .deleted {
+            StorageService.shared.deleteClip(id: clip.id, permanent: true)
+            showToast(message: loc("toast.permanentlyDeleted"), actionTitle: nil, action: nil)
+        } else {
+            let title = clip.displayTitle
+            StorageService.shared.deleteClip(id: clip.id, permanent: false)
+            showToast(
+                message: "\(loc("toast.deleted")): \(title)",
+                actionTitle: loc("toast.undo"),
+                action: { [weak self] in
+                    self?.undoLastDelete()
+                }
+            )
+        }
+
+        let items = filteredClips()
+        if selectedIndex >= items.count {
+            selectedIndex = max(0, items.count - 1)
+        }
+    }
+
+    @discardableResult
+    public func undoLastDelete() -> Bool {
+        if let restored = StorageService.shared.undoLastDelete() {
+            showToast(
+                message: "\(loc("toast.restored")): \(restored.displayTitle)",
+                actionTitle: nil,
+                action: nil
+            )
+            let items = filteredClips()
+            if let idx = items.firstIndex(where: { $0.id == restored.id }) {
+                selectedIndex = idx
+            }
+            return true
+        }
+        return false
+    }
+
+    public func restoreClip(_ clip: ClipItem) {
+        if let restored = StorageService.shared.restoreClip(id: clip.id) {
+            showToast(
+                message: "\(loc("toast.restored")): \(restored.displayTitle)",
+                actionTitle: nil,
+                action: nil
+            )
+            let items = filteredClips()
+            if selectedIndex >= items.count {
+                selectedIndex = max(0, items.count - 1)
+            }
         }
     }
 

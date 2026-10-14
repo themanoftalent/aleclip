@@ -20,24 +20,30 @@ public final class StorageService: ObservableObject {
     public static let shared = StorageService()
 
     @Published public private(set) var clips: [ClipItem] = []
+    @Published public private(set) var deletedClips: [ClipItem] = []
     @Published public var settings: AppSettings = AppSettings()
 
     private let fileManager = FileManager.default
     private let appSupportURL: URL
     private let historyFileURL: URL
+    private let deletedHistoryFileURL: URL
     private let settingsFileURL: URL
     private let blobsDirectoryURL: URL
+
+    private var undoStack: [(clip: ClipItem, originalIndex: Int)] = []
 
     private init() {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         self.appSupportURL = appSupport.appendingPathComponent("AleClip", isDirectory: true)
         self.historyFileURL = appSupportURL.appendingPathComponent("history.json")
+        self.deletedHistoryFileURL = appSupportURL.appendingPathComponent("deleted_history.json")
         self.settingsFileURL = appSupportURL.appendingPathComponent("settings.json")
         self.blobsDirectoryURL = appSupportURL.appendingPathComponent("blobs", isDirectory: true)
 
         createDirectoriesIfNeeded()
         loadSettings()
         loadHistory()
+        loadDeletedHistory()
     }
 
     private func createDirectoriesIfNeeded() {
@@ -94,24 +100,119 @@ public final class StorageService: ObservableObject {
         scheduleSaveHistory()
     }
 
-    public func deleteClip(id: UUID) {
-        guard let index = clips.firstIndex(where: { $0.id == id }) else { return }
-        let removed = clips.remove(at: index)
-        if let imageFileName = removed.imageFileName {
-            deleteBlob(named: imageFileName)
+    @discardableResult
+    public func deleteClip(id: UUID, permanent: Bool = false) -> ClipItem? {
+        if permanent {
+            // Check in deletedClips first
+            if let index = deletedClips.firstIndex(where: { $0.id == id }) {
+                let removed = deletedClips.remove(at: index)
+                undoStack.removeAll { $0.clip.id == id }
+                cleanupBlobIfNotReferenced(filename: removed.imageFileName)
+                saveDeletedHistory()
+                return removed
+            }
+            // Check in active clips
+            if let index = clips.firstIndex(where: { $0.id == id }) {
+                let removed = clips.remove(at: index)
+                undoStack.removeAll { $0.clip.id == id }
+                cleanupBlobIfNotReferenced(filename: removed.imageFileName)
+                scheduleSaveHistory()
+                return removed
+            }
+            return nil
         }
+
+        // Soft deletion: move from clips to deletedClips and push to undoStack
+        guard let index = clips.firstIndex(where: { $0.id == id }) else { return nil }
+        let removed = clips.remove(at: index)
+
+        // Push to undo stack (capped at 50)
+        undoStack.append((clip: removed, originalIndex: index))
+        if undoStack.count > 50 {
+            undoStack.removeFirst()
+        }
+
+        // Add to deleted clips (at front, capped at 100)
+        deletedClips.removeAll { $0.id == removed.id }
+        deletedClips.insert(removed, at: 0)
+        if deletedClips.count > 100 {
+            let overflow = deletedClips.suffix(from: 100)
+            for item in overflow {
+                cleanupBlobIfNotReferenced(filename: item.imageFileName)
+            }
+            deletedClips = Array(deletedClips.prefix(100))
+        }
+
         scheduleSaveHistory()
+        saveDeletedHistory()
+        return removed
+    }
+
+    @discardableResult
+    public func restoreClip(id: UUID) -> ClipItem? {
+        guard let index = deletedClips.firstIndex(where: { $0.id == id }) else { return nil }
+        let restored = deletedClips.remove(at: index)
+        undoStack.removeAll { $0.clip.id == id }
+
+        clips.removeAll { $0.id == restored.id }
+        clips.insert(restored, at: 0)
+
+        scheduleSaveHistory()
+        saveDeletedHistory()
+        return restored
+    }
+
+    @discardableResult
+    public func undoLastDelete() -> ClipItem? {
+        guard let last = undoStack.popLast() else { return nil }
+        let clip = last.clip
+        let targetIndex = min(last.originalIndex, clips.count)
+
+        deletedClips.removeAll { $0.id == clip.id }
+        clips.removeAll { $0.id == clip.id }
+        clips.insert(clip, at: targetIndex)
+
+        scheduleSaveHistory()
+        saveDeletedHistory()
+        return clip
+    }
+
+    public func emptyTrash() {
+        for item in deletedClips {
+            cleanupBlobIfNotReferenced(filename: item.imageFileName)
+        }
+        deletedClips.removeAll()
+        undoStack.removeAll()
+        saveDeletedHistory()
     }
 
     public func clearUnpinned() {
         let unpinned = clips.filter { !$0.isPinned }
         for item in unpinned {
-            if let imageFileName = item.imageFileName {
-                deleteBlob(named: imageFileName)
-            }
+            deletedClips.removeAll { $0.id == item.id }
+            deletedClips.insert(item, at: 0)
         }
         clips.removeAll { !$0.isPinned }
+
+        if deletedClips.count > 100 {
+            let overflow = deletedClips.suffix(from: 100)
+            for item in overflow {
+                cleanupBlobIfNotReferenced(filename: item.imageFileName)
+            }
+            deletedClips = Array(deletedClips.prefix(100))
+        }
+
         saveHistory()
+        saveDeletedHistory()
+    }
+
+    private func cleanupBlobIfNotReferenced(filename: String?) {
+        guard let filename = filename else { return }
+        let referencedInClips = clips.contains { $0.imageFileName == filename }
+        let referencedInDeleted = deletedClips.contains { $0.imageFileName == filename }
+        if !referencedInClips && !referencedInDeleted {
+            deleteBlob(named: filename)
+        }
     }
 
     private func pruneHistoryIfNeeded() {
@@ -122,16 +223,24 @@ public final class StorageService: ObservableObject {
         let overflow = clips.count - settings.historyLimit
 
         if overflow > 0 && !unpinnedIndices.isEmpty {
-            // Remove from the end (oldest)
+            // Move excess oldest unpinned to deletedClips
             let toRemove = unpinnedIndices.suffix(overflow)
             var idsToRemove: Set<UUID> = []
             for idx in toRemove {
                 idsToRemove.insert(clips[idx].id)
-                if let imageFileName = clips[idx].imageFileName {
-                    deleteBlob(named: imageFileName)
-                }
+                deletedClips.removeAll { $0.id == clips[idx].id }
+                deletedClips.insert(clips[idx], at: 0)
             }
             clips.removeAll { idsToRemove.contains($0.id) }
+
+            if deletedClips.count > 100 {
+                let extra = deletedClips.suffix(from: 100)
+                for item in extra {
+                    cleanupBlobIfNotReferenced(filename: item.imageFileName)
+                }
+                deletedClips = Array(deletedClips.prefix(100))
+            }
+            saveDeletedHistory()
         }
     }
 
@@ -187,6 +296,31 @@ public final class StorageService: ObservableObject {
             let backupURL = appSupportURL.appendingPathComponent("history.corrupt.\(timestamp).bak")
             try? fileManager.copyItem(at: historyFileURL, to: backupURL)
             self.clips = []
+        }
+    }
+
+    public func saveDeletedHistory() {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(deletedClips)
+            try data.write(to: deletedHistoryFileURL, options: .atomic)
+        } catch {
+            print("Failed to save deleted history: \(error)")
+        }
+    }
+
+    private func loadDeletedHistory() {
+        guard fileManager.fileExists(atPath: deletedHistoryFileURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: deletedHistoryFileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            self.deletedClips = try decoder.decode([ClipItem].self, from: data)
+        } catch {
+            print("Failed to load deleted history: \(error)")
+            self.deletedClips = []
         }
     }
 

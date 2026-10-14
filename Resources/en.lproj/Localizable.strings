@@ -8,6 +8,12 @@
 "filter.images" = "Images";
 "filter.files" = "Files";
 "filter.colors" = "Colors";
+"filter.deleted" = "Deleted";
+
+"toast.deleted" = "Clip deleted";
+"toast.undo" = "Undo (⌘Z)";
+"toast.restored" = "Clip restored";
+"toast.permanentlyDeleted" = "Clip permanently deleted";
 
 "menu.about" = "About AleClip";
 "menu.updates" = "Check for Updates…";
@@ -15,6 +21,7 @@
 "menu.recentClips" = "Recent Clips";
 "menu.noClips" = "  (No clips yet)";
 "menu.clearUnpinned" = "Clear Unpinned History";
+"menu.emptyTrash" = "Empty Deleted Clips";
 "menu.settings" = "Settings...";
 "menu.quit" = "Quit AleClip";
 
@@ -31,6 +38,7 @@
 
 "empty.noClips" = "No clips yet. Copy something to start.";
 "empty.noMatch" = "No clips match your search.";
+"empty.noDeletedClips" = "Trash is empty. Deleted clips will appear here.";
 
 "about.title" = "About AleClip";
 "about.tagline" = "A modern, lightweight native clipboard manager for macOS.";
@@ -43,6 +51,8 @@
 "card.quickLook" = "Quick Look (Space)";
 "card.edit" = "Edit (⌘E)";
 "card.delete" = "Delete (⌫)";
+"card.restore" = "Restore";
+"card.permanentlyDelete" = "Permanently Delete";
 "card.rgbColor" = "RGB Color";
 "card.websiteLink" = "Website Link";
 
@@ -52,7 +62,9 @@
 "context.unpin" = "Unpin Clip";
 "context.editText" = "Edit Text...";
 "context.quickLook" = "Quick Look Preview";
+"context.restore" = "Restore Clip";
 "context.delete" = "Delete Clip";
+"context.permanentlyDelete" = "Permanently Delete Clip";
 
 "settings.title" = "AleClip Settings";
 "settings.tab.general" = "General";
@@ -96,6 +108,7 @@
 "settings.shortcuts.quickLook" = "Quick Look preview (text, images, links, files, colors)";
 "settings.shortcuts.editClip" = "Edit text clip content or assign custom title";
 "settings.shortcuts.deleteClip" = "Delete selected clip from history";
+"settings.shortcuts.undoDelete" = "Undo last deleted clip";
 "settings.shortcuts.dismissPanel" = "Dismiss the panel without pasting";
 "settings.shortcuts.openSettings" = "Open Settings";
 

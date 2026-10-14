@@ -8,6 +8,12 @@
 "filter.images" = "Görseller";
 "filter.files" = "Dosyalar";
 "filter.colors" = "Renkler";
+"filter.deleted" = "Silinenler";
+
+"toast.deleted" = "Kayıt silindi";
+"toast.undo" = "Geri Al (⌘Z)";
+"toast.restored" = "Kayıt geri yüklendi";
+"toast.permanentlyDeleted" = "Kayıt kalıcı olarak silindi";
 
 "menu.about" = "AleClip Hakkında";
 "menu.updates" = "Güncellemeleri Denetle…";
@@ -15,6 +21,7 @@
 "menu.recentClips" = "Son Kopyalananlar";
 "menu.noClips" = "  (Henüz kayıt yok)";
 "menu.clearUnpinned" = "Sabitlenmemiş Geçmişi Temizle";
+"menu.emptyTrash" = "Silinenleri Tamamen Temizle";
 "menu.settings" = "Ayarlar…";
 "menu.quit" = "AleClip'ten Çık";
 
@@ -31,6 +38,7 @@
 
 "empty.noClips" = "Henüz kopyalanan bir şey yok. Başlamak için bir şey kopyala.";
 "empty.noMatch" = "Aramanla eşleşen kayıt yok.";
+"empty.noDeletedClips" = "Çöp kutusu boş. Silinen kayıtlar burada görünür.";
 
 "about.title" = "AleClip Hakkında";
 "about.tagline" = "macOS için modern, hafif ve yerel bir pano yöneticisi.";
@@ -43,6 +51,8 @@
 "card.quickLook" = "Hızlı Bakış (Space)";
 "card.edit" = "Düzenle (⌘E)";
 "card.delete" = "Sil (⌫)";
+"card.restore" = "Geri Yükle";
+"card.permanentlyDelete" = "Kalıcı Olarak Sil";
 "card.rgbColor" = "RGB Renk";
 "card.websiteLink" = "Web Bağlantısı";
 
@@ -52,7 +62,9 @@
 "context.unpin" = "Sabitlemeyi Kaldır";
 "context.editText" = "Metni Düzenle...";
 "context.quickLook" = "Hızlı Bakış Önizlemesi";
+"context.restore" = "Kaydı Geri Yükle";
 "context.delete" = "Kaydı Sil";
+"context.permanentlyDelete" = "Kaydı Kalıcı Olarak Sil";
 
 "settings.title" = "AleClip Ayarları";
 "settings.tab.general" = "Genel";
@@ -96,6 +108,7 @@
 "settings.shortcuts.quickLook" = "Hızlı Bakış önizlemesi (metin, görsel, bağlantı, dosya, renk)";
 "settings.shortcuts.editClip" = "Metin içeriğini düzenle veya özel başlık ata";
 "settings.shortcuts.deleteClip" = "Seçilen kaydı geçmişten sil";
+"settings.shortcuts.undoDelete" = "Silinen son kaydı geri al";
 "settings.shortcuts.dismissPanel" = "Yapıştırmadan paneli kapat";
 "settings.shortcuts.openSettings" = "Ayarları aç";
 

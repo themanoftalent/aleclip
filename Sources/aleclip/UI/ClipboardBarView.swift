@@ -48,20 +48,30 @@ public struct ClipboardBarView: View {
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, clip in
                                     ClipCardView(
                                         clip: clip,
-                                        shortcutNumber: index < 9 ? (index + 1) : nil,
+                                        shortcutNumber: controller.selectedFilter == .deleted ? nil : (index < 9 ? (index + 1) : nil),
                                         isSelected: index == controller.selectedIndex,
+                                        isDeleted: controller.selectedFilter == .deleted,
                                         onSelect: {
                                             controller.selectedIndex = index
                                         },
                                         onPaste: {
-                                            controller.selectedIndex = index
-                                            controller.pasteSelected()
+                                            if controller.selectedFilter == .deleted {
+                                                controller.restoreClip(clip)
+                                            } else {
+                                                controller.selectedIndex = index
+                                                controller.pasteSelected()
+                                            }
                                         },
                                         onTogglePin: {
-                                            storage.togglePin(for: clip.id)
+                                            if controller.selectedFilter != .deleted {
+                                                storage.togglePin(for: clip.id)
+                                            }
                                         },
                                         onDelete: {
-                                            storage.deleteClip(id: clip.id)
+                                            controller.deleteClip(clip)
+                                        },
+                                        onRestore: {
+                                            controller.restoreClip(clip)
                                         },
                                         onQuickLook: {
                                             controller.selectedIndex = index
@@ -113,6 +123,57 @@ public struct ClipboardBarView: View {
                         lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
                     )
             )
+
+            // Floating Toast Notification Banner
+            if let message = controller.toastMessage {
+                VStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: controller.toastActionTitle != nil ? "arrow.counterclockwise.circle.fill" : "checkmark.circle.fill")
+                            .foregroundColor(.accentColor)
+                            .font(.system(size: 13, weight: .semibold))
+
+                        Text(message)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        if let actionTitle = controller.toastActionTitle, let action = controller.toastAction {
+                            Button(action: action) {
+                                Text(actionTitle)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Capsule().fill(Color.accentColor))
+                                    .foregroundColor(.white)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button(action: { controller.dismissToast() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color(nsColor: .windowBackgroundColor))
+                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.15), radius: 8, x: 0, y: 3)
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                    )
+                    .padding(.top, 6)
+
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(200)
+            }
 
             // Overlays: Quick Look
             if let previewClip = controller.previewClip {
@@ -237,9 +298,17 @@ public struct ClipboardBarView: View {
                                 .font(.system(size: 10))
                             Text(tab.title)
                                 .font(.system(size: 11, weight: controller.selectedFilter == tab ? .semibold : .regular))
+                            if tab == .deleted && storage.deletedClips.count > 0 {
+                                Text("\(storage.deletedClips.count)")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 0.5)
+                                    .background(Capsule().fill(controller.selectedFilter == tab ? Color.accentColor : Color.primary.opacity(0.12)))
+                                    .foregroundColor(controller.selectedFilter == tab ? .white : .secondary)
+                            }
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4.5)
                         .foregroundColor(controller.selectedFilter == tab ? .primary : .secondary)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
@@ -251,6 +320,27 @@ public struct ClipboardBarView: View {
             }
 
             Spacer()
+
+            // Empty Trash button if in deleted tab
+            if controller.selectedFilter == .deleted && !storage.deletedClips.isEmpty {
+                Button(action: {
+                    storage.emptyTrash()
+                    controller.selectedIndex = 0
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "trash.slash")
+                            .font(.system(size: 10))
+                        Text(loc("menu.emptyTrash"))
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundColor(.red.opacity(0.85))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.red.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+                .help(loc("menu.emptyTrash"))
+            }
 
             // Settings button
             Button(action: {
@@ -264,17 +354,19 @@ public struct ClipboardBarView: View {
             .buttonStyle(.plain)
             .help(loc("menu.settings"))
 
-            // Clear unpinned button
-            Button(action: {
-                storage.clearUnpinned()
-                controller.selectedIndex = 0
-            }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+            // Clear unpinned button (when not in deleted tab)
+            if controller.selectedFilter != .deleted {
+                Button(action: {
+                    storage.clearUnpinned()
+                    controller.selectedIndex = 0
+                }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(loc("menu.clearUnpinned"))
             }
-            .buttonStyle(.plain)
-            .help(loc("menu.clearUnpinned"))
         }
         .padding(.horizontal, 16)
     }
@@ -291,8 +383,14 @@ public struct ClipboardBarView: View {
 
             HStack(spacing: 12) {
                 keyTip(key: "← →", desc: loc("footer.navigate"))
-                keyTip(key: "↵", desc: loc("footer.paste"))
-                keyTip(key: "Space", desc: loc("footer.preview"))
+                if controller.selectedFilter == .deleted {
+                    keyTip(key: "↵", desc: loc("card.restore"))
+                    keyTip(key: "⌫", desc: loc("card.permanentlyDelete"))
+                } else {
+                    keyTip(key: "↵", desc: loc("footer.paste"))
+                    keyTip(key: "Space", desc: loc("footer.preview"))
+                    keyTip(key: "⌘Z", desc: loc("toast.undo"))
+                }
                 keyTip(key: "Esc", desc: loc("footer.close"))
 
                 Button(action: {
@@ -346,6 +444,7 @@ public struct ClipboardBarView: View {
                 popoverShortcutRow(keys: ["Space"], action: loc("settings.shortcuts.quickLook"))
                 popoverShortcutRow(keys: ["⌘", "E"], action: loc("settings.shortcuts.editClip"))
                 popoverShortcutRow(keys: ["⌫"], action: loc("settings.shortcuts.deleteClip"))
+                popoverShortcutRow(keys: ["⌘", "Z"], action: loc("settings.shortcuts.undoDelete"))
                 popoverShortcutRow(keys: ["⌘", ","], action: loc("settings.shortcuts.openSettings"))
                 popoverShortcutRow(keys: ["Esc"], action: loc("settings.shortcuts.dismissPanel"))
             }
@@ -385,11 +484,13 @@ public struct ClipboardBarView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 8) {
-            Image(systemName: controller.searchText.isEmpty ? "tray" : "magnifyingglass")
+            Image(systemName: controller.selectedFilter == .deleted ? "trash" : (controller.searchText.isEmpty ? "tray" : "magnifyingglass"))
                 .font(.system(size: 28))
                 .foregroundColor(.secondary.opacity(0.7))
 
-            Text(controller.searchText.isEmpty ? loc("empty.noClips") : loc("empty.noMatch"))
+            Text(controller.selectedFilter == .deleted
+                 ? loc("empty.noDeletedClips")
+                 : (controller.searchText.isEmpty ? loc("empty.noClips") : loc("empty.noMatch")))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.secondary)
         }

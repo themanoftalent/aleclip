@@ -9,10 +9,12 @@ public struct ClipCardView: View {
     public let clip: ClipItem
     public let shortcutNumber: Int?
     public let isSelected: Bool
+    public let isDeleted: Bool
     public let onSelect: () -> Void
     public let onPaste: () -> Void
     public let onTogglePin: () -> Void
     public let onDelete: () -> Void
+    public let onRestore: (() -> Void)?
     public let onQuickLook: () -> Void
     public let onEdit: () -> Void
 
@@ -20,20 +22,24 @@ public struct ClipCardView: View {
         clip: ClipItem,
         shortcutNumber: Int? = nil,
         isSelected: Bool,
+        isDeleted: Bool = false,
         onSelect: @escaping () -> Void,
         onPaste: @escaping () -> Void,
         onTogglePin: @escaping () -> Void,
         onDelete: @escaping () -> Void,
+        onRestore: (() -> Void)? = nil,
         onQuickLook: @escaping () -> Void,
         onEdit: @escaping () -> Void
     ) {
         self.clip = clip
         self.shortcutNumber = shortcutNumber
         self.isSelected = isSelected
+        self.isDeleted = isDeleted
         self.onSelect = onSelect
         self.onPaste = onPaste
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
+        self.onRestore = onRestore
         self.onQuickLook = onQuickLook
         self.onEdit = onEdit
     }
@@ -88,13 +94,30 @@ public struct ClipCardView: View {
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
 
-                Button(action: onTogglePin) {
-                    Image(systemName: clip.isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 10))
-                        .foregroundColor(clip.isPinned ? .orange : .secondary.opacity(0.6))
+                if isDeleted, let onRestore = onRestore {
+                    Button(action: onRestore) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 8, weight: .bold))
+                            Text(loc("card.restore"))
+                                .font(.system(size: 8, weight: .bold))
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1.5)
+                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.accentColor.opacity(0.18)))
+                        .foregroundColor(.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .help(loc("card.restore"))
+                } else {
+                    Button(action: onTogglePin) {
+                        Image(systemName: clip.isPinned ? "pin.fill" : "pin")
+                            .font(.system(size: 10))
+                            .foregroundColor(clip.isPinned ? .orange : .secondary.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .help(loc(clip.isPinned ? "card.unpin" : "card.pin"))
                 }
-                .buttonStyle(.plain)
-                .help(loc(clip.isPinned ? "card.unpin" : "card.pin"))
             }
 
             // Body Preview (vertically balanced with frame alignment)
@@ -114,31 +137,41 @@ public struct ClipCardView: View {
 
                 if hoverModel.isHovered || isSelected {
                     HStack(spacing: 6) {
-                        Button(action: onQuickLook) {
-                            Image(systemName: "eye")
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help(loc("card.quickLook"))
-
-                        if clip.type == .text || clip.type == .richText {
-                            Button(action: onEdit) {
-                                Image(systemName: "pencil")
+                        if isDeleted, let onRestore = onRestore {
+                            Button(action: onRestore) {
+                                Image(systemName: "arrow.uturn.backward.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.accentColor)
+                            }
+                            .buttonStyle(.plain)
+                            .help(loc("card.restore"))
+                        } else {
+                            Button(action: onQuickLook) {
+                                Image(systemName: "eye")
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
                             }
                             .buttonStyle(.plain)
-                            .help(loc("card.edit"))
+                            .help(loc("card.quickLook"))
+
+                            if clip.type == .text || clip.type == .richText {
+                                Button(action: onEdit) {
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help(loc("card.edit"))
+                            }
                         }
 
                         Button(action: onDelete) {
-                            Image(systemName: "trash")
+                            Image(systemName: isDeleted ? "xmark.circle.fill" : "trash")
                                 .font(.system(size: 10))
                                 .foregroundColor(.red.opacity(0.8))
                         }
                         .buttonStyle(.plain)
-                        .help(loc("card.delete"))
+                        .help(loc(isDeleted ? "card.permanentlyDelete" : "card.delete"))
                     }
                 }
             }
@@ -197,26 +230,44 @@ public struct ClipCardView: View {
             hoverModel.isHovered = hovering
         }
         .contextMenu {
-            Button(loc("context.paste")) {
-                onPaste()
-            }
-            Button(loc("context.copy")) {
-                PasteService.shared.copyToClipboard(clip)
-            }
-            Button(loc(clip.isPinned ? "context.unpin" : "context.pin")) {
-                onTogglePin()
-            }
-            if clip.type == .text || clip.type == .richText {
-                Button(loc("context.editText")) {
-                    onEdit()
+            if isDeleted {
+                if let onRestore = onRestore {
+                    Button(loc("context.restore")) {
+                        onRestore()
+                    }
                 }
-            }
-            Button(loc("context.quickLook")) {
-                onQuickLook()
-            }
-            Divider()
-            Button(loc("context.delete"), role: .destructive) {
-                onDelete()
+                Button(loc("context.copy")) {
+                    PasteService.shared.copyToClipboard(clip)
+                }
+                Button(loc("context.quickLook")) {
+                    onQuickLook()
+                }
+                Divider()
+                Button(loc("context.permanentlyDelete"), role: .destructive) {
+                    onDelete()
+                }
+            } else {
+                Button(loc("context.paste")) {
+                    onPaste()
+                }
+                Button(loc("context.copy")) {
+                    PasteService.shared.copyToClipboard(clip)
+                }
+                Button(loc(clip.isPinned ? "context.unpin" : "context.pin")) {
+                    onTogglePin()
+                }
+                if clip.type == .text || clip.type == .richText {
+                    Button(loc("context.editText")) {
+                        onEdit()
+                    }
+                }
+                Button(loc("context.quickLook")) {
+                    onQuickLook()
+                }
+                Divider()
+                Button(loc("context.delete"), role: .destructive) {
+                    onDelete()
+                }
             }
         }
     }
@@ -316,7 +367,7 @@ public struct ClipCardView: View {
         case .image: return .green
         case .link: return .teal
         case .file: return .orange
-        case .color: return .pink
+        case .color: return .cyan
         }
     }
 
