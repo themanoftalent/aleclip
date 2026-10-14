@@ -35,8 +35,10 @@
 
 ---
 
-## ✨ Features (v2.0.0)
+## ✨ Features (v2.0.1 - 2026)
 
+- **Instant Undo (`⌘Z`) & Toast Banner**: Immediately recover accidentally deleted notes or clips with `⌘Z` or by clicking the notification banner.
+- **Recently Deleted (Trash Bin)**: Dedicated filter tab storing deleted notes with one-click restore (`↵` or button) and permanent purge options.
 - **Non-Activating Floating Panel**: Slides up smoothly from the bottom of your screen using `⌥V` (or your chosen shortcut) without stealing window focus from your active apps.
 - **Smart Multi-Monitor Detection**: Automatically identifies which screen your mouse cursor is on and positions the panel on that display.
 - **Click-Away Auto-Dismiss**: Seamlessly dismisses the panel if you click outside on desktop/other windows or switch apps.
