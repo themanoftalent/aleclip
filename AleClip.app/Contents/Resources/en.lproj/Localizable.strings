@@ -1,0 +1,159 @@
+/* AleClip - English Localization */
+
+"panel.searchPlaceholder" = "Search clips...";
+"filter.all" = "All";
+"filter.pinned" = "Pinned";
+"filter.text" = "Text";
+"filter.links" = "Links";
+"filter.images" = "Images";
+"filter.files" = "Files";
+"filter.colors" = "Colors";
+"filter.deleted" = "Deleted";
+
+"toast.deleted" = "Clip deleted";
+"toast.undo" = "Undo (⌘Z)";
+"toast.restored" = "Clip restored";
+"toast.permanentlyDeleted" = "Clip permanently deleted";
+
+"menu.about" = "About AleClip";
+"menu.updates" = "Check for Updates…";
+"menu.openPanel" = "Open Clipboard Panel";
+"menu.recentClips" = "Recent Clips";
+"menu.noClips" = "  (No clips yet)";
+"menu.clearUnpinned" = "Clear Unpinned History";
+"menu.emptyTrash" = "Empty Deleted Clips";
+"menu.settings" = "Settings...";
+"menu.quit" = "Quit AleClip";
+
+"footer.navigate" = "Navigate";
+"footer.paste" = "Paste";
+"footer.plainText" = "Plain Text";
+"footer.preview" = "Preview";
+"footer.edit" = "Edit";
+"footer.delete" = "Delete";
+"footer.close" = "Close";
+"footer.settings" = "Settings";
+"footer.clip" = "clip";
+"footer.clips" = "clips";
+
+"empty.noClips" = "No clips yet. Copy something to start.";
+"empty.noMatch" = "No clips match your search.";
+"empty.noDeletedClips" = "Trash is empty. Deleted clips will appear here.";
+
+"about.title" = "About AleClip";
+"about.tagline" = "A modern, lightweight native clipboard manager for macOS.";
+"about.developedBy" = "Developed by SoftAI Yazılım";
+"about.version" = "Version %@ (%@)";
+
+"card.pinnedBadge" = "PIN";
+"card.pin" = "Pin clip";
+"card.unpin" = "Unpin clip";
+"card.quickLook" = "Quick Look (Space)";
+"card.edit" = "Edit (⌘E)";
+"card.delete" = "Delete (⌫)";
+"card.restore" = "Restore";
+"card.permanentlyDelete" = "Permanently Delete";
+"card.rgbColor" = "RGB Color";
+"card.websiteLink" = "Website Link";
+
+"context.paste" = "Paste into Active App";
+"context.copy" = "Copy to Clipboard";
+"context.pin" = "Pin Clip";
+"context.unpin" = "Unpin Clip";
+"context.editText" = "Edit Text...";
+"context.quickLook" = "Quick Look Preview";
+"context.restore" = "Restore Clip";
+"context.delete" = "Delete Clip";
+"context.permanentlyDelete" = "Permanently Delete Clip";
+
+"settings.title" = "AleClip Settings";
+"settings.tab.general" = "General";
+"settings.tab.shortcuts" = "Shortcuts";
+"settings.tab.exclusions" = "Exclusions";
+"settings.tab.backup" = "Backup";
+"settings.tab.about" = "About";
+
+"settings.general.language" = "Language / Dil";
+"settings.general.langSystem" = "System (follow macOS)";
+"settings.general.langEn" = "English";
+"settings.general.langTr" = "Türkçe";
+"settings.general.historyLimits" = "History Limits";
+"settings.general.maxItems" = "Maximum items stored in history:";
+"settings.general.historyHelp" = "Older unpinned clips are automatically purged when history exceeds this limit. Pinned clips are always preserved.";
+"settings.general.pasteBehavior" = "Paste Behavior";
+"settings.general.pasteDirectly" = "Paste directly into active application upon selection";
+"settings.general.accessGranted" = "Accessibility Permission Granted";
+"settings.general.accessRequired" = "Accessibility Permission Required";
+"settings.general.accessGrantedDesc" = "AleClip can synthesize ⌘V directly into your active apps.";
+"settings.general.accessRequiredDesc" = "macOS requires Accessibility access to simulate paste keystrokes.";
+"settings.general.openSysSettings" = "Open System Settings";
+"settings.general.plainTextAlways" = "Always paste as unformatted plain text (strip rich text & HTML styling)";
+"settings.general.audioFeedback" = "Audio Feedback";
+"settings.general.soundEffects" = "Play sound feedback when copying or pasting clips";
+
+"settings.alert.langRestartTitle" = "Language Changed";
+"settings.alert.langRestartMsg" = "Restart AleClip to apply the new language.";
+"settings.alert.restartNow" = "Restart Now";
+"settings.alert.later" = "Later";
+
+"settings.shortcuts.globalTitle" = "Global Activation Shortcut";
+"settings.shortcuts.globalDesc" = "Shortcut to open/close AleClip:";
+"settings.shortcuts.globalHelp" = "Pressing this global shortcut from any app brings up the non-activating bottom panel without stealing window focus.";
+"settings.shortcuts.guideTitle" = "In-Panel Keyboard Shortcuts";
+"settings.shortcuts.togglePanel" = "Open / Dismiss AleClip bottom panel";
+"settings.shortcuts.navigateCards" = "Navigate between clipboard cards";
+"settings.shortcuts.pasteClip" = "Paste selected clip into frontmost app";
+"settings.shortcuts.quickPaste" = "Quick paste card 1 to 9 directly";
+"settings.shortcuts.plainPaste" = "Paste clip as unformatted plain text";
+"settings.shortcuts.quickLook" = "Quick Look preview (text, images, links, files, colors)";
+"settings.shortcuts.editClip" = "Edit text clip content or assign custom title";
+"settings.shortcuts.deleteClip" = "Delete selected clip from history";
+"settings.shortcuts.undoDelete" = "Undo last deleted clip";
+"settings.shortcuts.dismissPanel" = "Dismiss the panel without pasting";
+"settings.shortcuts.openSettings" = "Open Settings";
+
+"settings.exclusions.title" = "Excluded Applications";
+"settings.exclusions.help" = "Copies made while any of these applications are frontmost will never be captured or stored.";
+"settings.exclusions.empty" = "No applications excluded yet.";
+"settings.exclusions.chooseApp" = "Choose Application from Mac...";
+"settings.exclusions.enterBundle" = "Or enter bundle ID (e.g. com.example.app)";
+"settings.exclusions.add" = "Add";
+
+"settings.backup.title" = "History Backup & Restore";
+"settings.backup.help" = "Export your clipboard history as a standard JSON file, or restore from a previous backup. Duplicate clips are automatically skipped.";
+"settings.backup.exportBtn" = "Export History to JSON...";
+"settings.backup.importBtn" = "Import History from JSON...";
+"settings.backup.manageTitle" = "Manage Stored Data";
+"settings.backup.manageHelp" = "Remove all unpinned items from the history database. Pinned clips and preferences will remain intact.";
+"settings.backup.clearUnpinnedBtn" = "Clear All Unpinned Clips";
+"settings.backup.clearSuccess" = "All unpinned clips have been cleared.";
+"settings.backup.exportSuccess" = "History successfully exported!";
+"settings.backup.exportFailed" = "Export failed: %@";
+"settings.backup.importSuccess" = "Successfully imported %d new clips!";
+"settings.backup.importFailed" = "Import failed: %@";
+
+"settings.about.clipsStats" = "%d clips in history • %d pinned";
+"settings.about.localOnly" = "All clipboard content is stored strictly locally on your Mac. No network telemetry.";
+"settings.about.techStack" = "Built natively with Swift 6, AppKit, and SwiftUI.";
+"settings.about.zeroData" = "Zero Data Collection";
+"settings.about.freeEveryone" = "100% Free for Everyone";
+"settings.about.freeFork" = "Free to Fork & Customize";
+
+"edit.title" = "Edit Text Clip";
+"edit.customTitle" = "Custom Title (Optional)";
+"edit.titlePlaceholder" = "Clip title...";
+"edit.content" = "Clip Content";
+"edit.cancel" = "Cancel";
+"edit.save" = "Save Changes";
+
+"quicklook.title" = "Quick Look Preview";
+"quicklook.footerHint" = "Press Space or Esc to close";
+"quicklook.copy" = "Copy";
+"quicklook.pasteIntoApp" = "Paste into App";
+"quicklook.paste" = "Paste (↵)";
+"quicklook.close" = "Close (Esc)";
+"quicklook.stats" = "%d characters • %d words";
+"quicklook.noImageData" = "Image data not available";
+"quicklook.copyHex" = "Copy Hex Code";
+"quicklook.openBrowser" = "Open in Default Browser";
+"quicklook.revealFinder" = "Reveal in Finder";
