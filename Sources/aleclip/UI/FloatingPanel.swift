@@ -168,7 +168,7 @@ public final class FloatingPanelController: ObservableObject {
         let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen = targetScreen {
             let screenRect = screen.visibleFrame
-            let panelHeight: CGFloat = 330
+            let panelHeight: CGFloat = 350
             panel.setFrame(NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width, height: panelHeight), display: true)
         }
 

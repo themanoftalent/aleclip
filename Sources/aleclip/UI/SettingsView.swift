@@ -106,7 +106,7 @@ public struct SettingsView: View {
             }
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
         }
-        .frame(width: 680, height: 560)
+        .frame(width: 740, height: 570)
         .alert(item: $model.activeAlert) { item in
             switch item {
             case .info(let message):
@@ -131,25 +131,31 @@ public struct SettingsView: View {
     // MARK: - Top Tab Bar
 
     private var topTabBar: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
+            Spacer()
             ForEach(SettingsTab.allCases) { tab in
+                let isSelected = model.selectedTab == tab
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.12)) {
                         model.selectedTab = tab
                     }
                 }) {
-                    HStack(spacing: 5) {
+                    VStack(spacing: 4) {
                         Image(systemName: tab.iconName)
-                            .font(.system(size: 11))
+                            .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                            .frame(height: 20)
+
                         Text(tab.title)
-                            .font(.system(size: 12, weight: model.selectedTab == tab ? .semibold : .regular))
+                            .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .foregroundColor(model.selectedTab == tab ? .white : .primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.8))
                     .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(model.selectedTab == tab ? Color.accentColor : Color.clear)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
                     )
                 }
                 .buttonStyle(.plain)

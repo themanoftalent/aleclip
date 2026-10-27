@@ -180,7 +180,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     @objc public func openSettingsAction() {
         if settingsWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 620, height: 530),
+                contentRect: NSRect(x: 0, y: 0, width: 740, height: 570),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -192,6 +192,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             self.settingsWindow = window
         } else {
             settingsWindow?.title = loc("settings.title")
+            settingsWindow?.setContentSize(NSSize(width: 740, height: 570))
         }
 
         settingsWindow?.center()

@@ -23,18 +23,50 @@ public struct ClipboardBarView: View {
         return nil
     }
 
+    private var availableApps: [String] {
+        let names = Set(storage.clips.compactMap { $0.sourceAppName?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        return Array(names).sorted()
+    }
+
+    private func countForTab(_ tab: FloatingPanelController.FilterTab) -> Int {
+        switch tab {
+        case .all:
+            return storage.clips.count
+        case .pinned:
+            return storage.clips.filter { $0.isPinned }.count
+        case .text:
+            return storage.clips.filter { $0.type == .text || $0.type == .richText || $0.type == .html }.count
+        case .code:
+            return storage.clips.filter { $0.type == .code || $0.detectedLanguage != nil }.count
+        case .links:
+            return storage.clips.filter { $0.type == .link }.count
+        case .images:
+            return storage.clips.filter { $0.type == .image }.count
+        case .files:
+            return storage.clips.filter { $0.type == .file }.count
+        case .colors:
+            return storage.clips.filter { $0.type == .color }.count
+        case .deleted:
+            return storage.deletedClips.count
+        }
+    }
+
     public var body: some View {
         let items = controller.filteredClips()
 
         ZStack(alignment: .bottom) {
             // Edge-to-Edge Shelf Window
-            VStack(spacing: 4) {
-                // MARK: - Top Pinboards Bar (Paste header)
+            VStack(spacing: 6) {
+                // MARK: - Row 1: Brand & Search + Pinboards Bar (Paste style) + Tools
                 pinboardHeaderBar(itemsCount: items.count)
                     .padding(.top, 8)
                     .padding(.horizontal, 24)
 
-                // Status Strip (if Paste Stack or Screen Privacy active)
+                // MARK: - Row 2: AleClip Content Type Filters & App/Date Filters
+                filterSubHeaderBar
+                    .padding(.horizontal, 24)
+
+                // Status Strip (if Paste Stack or Screen Privacy or Pause active)
                 statusNotificationStrip
                     .padding(.horizontal, 24)
 
@@ -100,7 +132,7 @@ public struct ClipboardBarView: View {
                             }
                         }
                         .padding(.horizontal, 24)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 4)
                     }
                     .onChange(of: controller.selectedIndex) { _, newIndex in
                         if newIndex >= 0 && newIndex < items.count {
@@ -110,14 +142,14 @@ public struct ClipboardBarView: View {
                         }
                     }
                 }
-                .frame(height: 236)
+                .frame(height: 228)
 
                 // MARK: - Footer Bar
                 footerBar(itemsCount: items.count)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 6)
             }
-            .frame(maxWidth: .infinity, maxHeight: 330)
+            .frame(maxWidth: .infinity, maxHeight: 350)
             .background(
                 ZStack {
                     Rectangle()
@@ -126,6 +158,7 @@ public struct ClipboardBarView: View {
                             Rectangle()
                                 .fill(.ultraThinMaterial)
                         )
+                    watermarkLayer(itemsCount: items.count)
                 }
             )
             .overlay(alignment: .top) {
@@ -299,7 +332,7 @@ public struct ClipboardBarView: View {
                         )
                         storage.addClip(newClip)
                         controller.showNewClipSheet = false
-                        controller.showToast(message: "Created item")
+                        controller.showToast(message: "Created new text clip")
                     },
                     onCancel: {
                         controller.showNewClipSheet = false
@@ -309,7 +342,7 @@ public struct ClipboardBarView: View {
                 .zIndex(340)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: 330)
+        .frame(maxWidth: .infinity, maxHeight: 350)
         .onAppear {
             controller.focusSearchTrigger = {
                 isSearchFieldFocused = true
@@ -317,44 +350,48 @@ public struct ClipboardBarView: View {
         }
     }
 
-    // MARK: - Pinboards Header Bar (Exact Paste Style)
+    // MARK: - Row 1: Brand, Search, Pinboards Bar & Actions
 
     private func pinboardHeaderBar(itemsCount: Int) -> some View {
         HStack(spacing: 12) {
-            // Search Input Field
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 12))
+            // Brand Mark & Search Input Field
+            HStack(spacing: 10) {
+                WatermarkView(isCompact: true)
 
-                TextField("Search history & OCR…", text: $controller.searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-                    .focused($isSearchFieldFocused)
-                    .onChange(of: isSearchFieldFocused) { _, focused in
-                        controller.isSearchFocused = focused
-                    }
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 11.5))
 
-                if !controller.searchText.isEmpty {
-                    Button(action: { controller.searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 11))
+                    TextField(loc("panel.searchPlaceholder"), text: $controller.searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .focused($isSearchFieldFocused)
+                        .onChange(of: isSearchFieldFocused) { _, focused in
+                            controller.isSearchFocused = focused
+                        }
+
+                    if !controller.searchText.isEmpty {
+                        Button(action: { controller.searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.85))
+                )
+                .frame(width: 180)
             }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.85))
-            )
-            .frame(width: 190)
 
             Spacer()
 
-            // Centered Pinboards Bar
+            // Centered Pinboards Bar (Paste style)
             HStack(spacing: 8) {
                 // Clipboard History (Default tab)
                 let isHistorySelected = controller.selectedCollectionId == nil && controller.selectedFilter != .deleted
@@ -363,7 +400,7 @@ public struct ClipboardBarView: View {
                     controller.selectedFilter = .all
                     controller.selectedIndex = 0
                 }) {
-                    Text("Clipboard History")
+                    Text(loc("filter.all"))
                         .font(.system(size: 12, weight: isHistorySelected ? .bold : .medium))
                         .padding(.horizontal, 14)
                         .padding(.vertical, 5)
@@ -507,6 +544,133 @@ public struct ClipboardBarView: View {
         }
     }
 
+    // MARK: - Row 2: Content Type Filters & Metadata Filters (AleClip Features)
+
+    private var filterSubHeaderBar: some View {
+        HStack(spacing: 8) {
+            // Type Filter Pills
+            HStack(spacing: 4) {
+                ForEach(FloatingPanelController.FilterTab.allCases) { tab in
+                    let isSelected = controller.selectedFilter == tab
+                    let count = countForTab(tab)
+
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.12)) {
+                            controller.selectedFilter = tab
+                            controller.selectedIndex = 0
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: tab.iconName)
+                                .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+
+                            Text(tab.title)
+                                .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 0.5)
+                                    .background(Capsule().fill(isSelected ? Color.white.opacity(0.25) : Color.primary.opacity(0.08)))
+                                    .foregroundColor(isSelected ? .white : .secondary)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3.5)
+                        .foregroundColor(isSelected ? .white : .primary)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? (tab == .deleted ? Color.red.opacity(0.85) : Color.accentColor) : Color.primary.opacity(0.05))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Spacer()
+
+            // Filter by Application Menu
+            if !availableApps.isEmpty {
+                Menu {
+                    Button(loc("filter.all")) {
+                        controller.selectedAppFilter = nil
+                    }
+                    Divider()
+                    ForEach(availableApps, id: \.self) { app in
+                        Button(app) {
+                            controller.selectedAppFilter = app
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "app.badge")
+                            .font(.system(size: 10))
+                        Text(controller.selectedAppFilter ?? "App: All")
+                            .font(.system(size: 10.5, weight: .medium))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(controller.selectedAppFilter != nil ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05)))
+                    .foregroundColor(controller.selectedAppFilter != nil ? .accentColor : .secondary)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+
+            // Filter by Date Menu
+            Menu {
+                ForEach(DateFilterOption.allCases) { opt in
+                    Button(opt.rawValue) {
+                        controller.selectedDateFilter = opt
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 10))
+                    Text(controller.selectedDateFilter.rawValue)
+                        .font(.system(size: 10.5, weight: .medium))
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(controller.selectedDateFilter != .allTime ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.05)))
+                .foregroundColor(controller.selectedDateFilter != .allTime ? .accentColor : .secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+    }
+
+    // MARK: - Watermark Layer
+
+    @ViewBuilder
+    private func watermarkLayer(itemsCount: Int) -> some View {
+        GeometryReader { geo in
+            let cardsWidth = CGFloat(itemsCount) * (210 + 16) + 48
+            let remainingWidth = geo.size.width - cardsWidth
+
+            ZStack {
+                if itemsCount == 0 {
+                    EmptyView()
+                } else if remainingWidth > 260 {
+                    HStack(spacing: 0) {
+                        Spacer().frame(width: max(0, cardsWidth))
+                        WatermarkView(isCompact: false)
+                            .opacity(0.30)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    }
+                } else {
+                    WatermarkView(isCompact: false)
+                        .opacity(0.05)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     // MARK: - Status Strip
 
     @ViewBuilder
@@ -562,7 +726,33 @@ public struct ClipboardBarView: View {
 
     private func footerBar(itemsCount: Int) -> some View {
         HStack {
-            if !controller.multiSelectedIds.isEmpty {
+            if controller.selectedFilter == .deleted {
+                HStack(spacing: 8) {
+                    Image(systemName: "trash.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 11))
+                    Text("Trash Bin (\(storage.deletedClips.count))")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.red)
+
+                    if !storage.deletedClips.isEmpty {
+                        Button("Empty Trash") {
+                            storage.emptyTrash()
+                            controller.showToast(message: "Trash emptied")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    }
+
+                    Button("Back to All") {
+                        controller.selectedFilter = .all
+                        controller.selectedIndex = 0
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(.secondary)
+                }
+            } else if !controller.multiSelectedIds.isEmpty {
                 HStack(spacing: 6) {
                     Text("\(controller.multiSelectedIds.count) items selected")
                         .font(.system(size: 11, weight: .bold))
@@ -590,13 +780,18 @@ public struct ClipboardBarView: View {
             Spacer()
 
             HStack(spacing: 12) {
-                keyTip(key: "↵", desc: "Paste to \(controller.previousApp?.localizedName ?? "App")")
-                keyTip(key: "⇧↵", desc: "Plain Text")
-                keyTip(key: "Space", desc: "Quick Look")
-                keyTip(key: "⌘E", desc: "Edit")
-                keyTip(key: "⌘R", desc: "Rename")
-                keyTip(key: "⌫", desc: "Delete")
-                keyTip(key: "⌘Z", desc: "Undo")
+                if controller.selectedFilter == .deleted {
+                    keyTip(key: "↵", desc: loc("card.restore"))
+                    keyTip(key: "⌫", desc: loc("card.permanentlyDelete"))
+                } else {
+                    keyTip(key: "↵", desc: "Paste to \(controller.previousApp?.localizedName ?? "App")")
+                    keyTip(key: "⇧↵", desc: "Plain Text")
+                    keyTip(key: "Space", desc: "Quick Look")
+                    keyTip(key: "⌘E", desc: "Edit")
+                    keyTip(key: "⌘R", desc: "Rename")
+                    keyTip(key: "⌫", desc: "Delete")
+                    keyTip(key: "⌘Z", desc: "Undo")
+                }
                 keyTip(key: "Esc", desc: "Close")
 
                 Button(action: {
@@ -686,27 +881,26 @@ public struct ClipboardBarView: View {
         VStack(spacing: 12) {
             if controller.selectedFilter == .deleted {
                 Image(systemName: "trash")
-                    .font(.system(size: 36))
+                    .font(.system(size: 38))
                     .foregroundColor(.secondary.opacity(0.6))
 
-                Text("Trash is empty")
+                Text(loc("empty.noDeletedClips"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
             } else if !controller.searchText.isEmpty {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 32))
+                    .font(.system(size: 34))
                     .foregroundColor(.secondary.opacity(0.6))
 
-                Text("No clips match your search")
+                Text(loc("empty.noSearchResults"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
             } else {
-                Image(systemName: "paperclip")
-                    .font(.system(size: 32))
-                    .foregroundColor(.accentColor.opacity(0.7))
+                WatermarkView(isCompact: false)
+                    .padding(.bottom, 6)
 
-                Text("No clips yet. Copy something to start.")
-                    .font(.system(size: 12.5, weight: .medium))
+                Text(loc("empty.noClips"))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
             }
         }
