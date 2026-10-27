@@ -77,7 +77,7 @@ func runTests() {
     print("  ✔ Unlimited clipboard history protection passed")
 
     // 6. Pinboards & Collections (Feature 5)
-    let testCollection = ClipCollection(name: "Dev Snippets", icon: "curlybraces", color: "purple")
+    let testCollection = ClipCollection(name: "Dev Snippets", icon: "curlybraces", colorHex: "#BF5AF2")
     storage.addCollection(testCollection)
     assert(storage.collections.contains { $0.id == testCollection.id }, "Collection must be stored")
 

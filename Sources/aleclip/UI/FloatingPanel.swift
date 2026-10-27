@@ -118,7 +118,7 @@ public final class FloatingPanelController: ObservableObject {
     private init() {}
 
     public func setup() {
-        let panelRect = NSRect(x: 0, y: 0, width: 920, height: 280)
+        let panelRect = NSRect(x: 0, y: 0, width: 980, height: 290)
         let panel = FloatingPanel(contentRect: panelRect)
 
         let hostingView = NSHostingView(rootView: ClipboardBarView())

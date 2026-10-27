@@ -11,6 +11,7 @@ public struct ClipCardView: View {
     public let isSelected: Bool
     public let isMultiSelected: Bool
     public let isDeleted: Bool
+    public let accentColorHex: String?
     public let onSelect: () -> Void
     public let onToggleMultiSelect: () -> Void
     public let onPaste: () -> Void
@@ -27,6 +28,7 @@ public struct ClipCardView: View {
         isSelected: Bool,
         isMultiSelected: Bool = false,
         isDeleted: Bool = false,
+        accentColorHex: String? = nil,
         onSelect: @escaping () -> Void,
         onToggleMultiSelect: @escaping () -> Void = {},
         onPaste: @escaping () -> Void,
@@ -42,6 +44,7 @@ public struct ClipCardView: View {
         self.isSelected = isSelected
         self.isMultiSelected = isMultiSelected
         self.isDeleted = isDeleted
+        self.accentColorHex = accentColorHex
         self.onSelect = onSelect
         self.onToggleMultiSelect = onToggleMultiSelect
         self.onPaste = onPaste
@@ -59,146 +62,153 @@ public struct ClipCardView: View {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
+    private var cardBorderColor: Color {
+        if isSelected || isMultiSelected {
+            if let hex = accentColorHex {
+                return Color(hex: hex)
+            }
+            return Color.accentColor
+        }
+        if clip.isPinned {
+            return Color.orange.opacity(0.5)
+        }
+        if hoverModel.isHovered {
+            return Color.primary.opacity(0.3)
+        }
+        return Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08)
+    }
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header: Type badge & Pin & Relative Time
-            HStack(spacing: 5) {
-                if isMultiSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.accentColor)
-                } else {
-                    Image(systemName: clip.type.iconName)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(typeColor)
-                }
-
-                Text(clip.type.displayName)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.primary.opacity(0.85))
-
-                if let lang = clip.detectedLanguage {
-                    Text(lang)
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.purple.opacity(0.18)))
-                        .foregroundColor(.purple)
-                }
-
-                if clip.ocrText != nil {
-                    Text("OCR")
-                        .font(.system(size: 7, weight: .black, design: .rounded))
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.blue.opacity(0.18)))
-                        .foregroundColor(.blue)
-                }
-
-                if let num = shortcutNumber {
-                    Text("⌘\(num)")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 3.5)
-                        .padding(.vertical, 1)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.08))
-                        )
-                        .foregroundColor(isSelected ? .accentColor : .secondary)
-                }
-
-                if clip.isPinned {
-                    HStack(spacing: 2) {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 8))
-                        Text(loc("card.pinnedBadge"))
-                            .font(.system(size: 8, weight: .bold, design: .rounded))
-                    }
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .foregroundColor(.orange)
-                    .background(
-                        Capsule().fill(Color.orange.opacity(0.18))
-                    )
-                }
-
-                Spacer()
-
-                Text(clip.relativeTimeString)
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-
-                if isDeleted, let onRestore = onRestore {
-                    Button(action: onRestore) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "arrow.uturn.backward")
-                                .font(.system(size: 8, weight: .bold))
-                            Text(loc("card.restore"))
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1.5)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.accentColor.opacity(0.18)))
-                        .foregroundColor(.accentColor)
-                    }
-                    .buttonStyle(.plain)
-                    .help(loc("card.restore"))
-                } else {
-                    Button(action: onTogglePin) {
-                        Image(systemName: clip.isPinned ? "pin.fill" : "pin")
-                            .font(.system(size: 10))
-                            .foregroundColor(clip.isPinned ? .orange : .secondary.opacity(0.6))
-                    }
-                    .buttonStyle(.plain)
-                    .help(loc(clip.isPinned ? "card.unpin" : "card.pin"))
-                }
-            }
-
-            // Body Preview (with Screen Privacy shield when enabled)
-            ZStack {
-                contentPreview
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .blur(radius: privacy.isShieldActive ? 12 : 0)
-
-                if privacy.isShieldActive {
-                    HStack(spacing: 4) {
-                        Image(systemName: "eye.slash.fill")
-                            .font(.system(size: 10))
-                        Text("Protected")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color(nsColor: .windowBackgroundColor).opacity(0.9)))
-                    .foregroundColor(.secondary)
-                }
-            }
-
-            // Footer: Source App & Actions
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header Row: App Icon + App Name + Time + Quick Paste Badge
+            HStack(spacing: 6) {
                 // Source App Icon
                 if let bundleId = clip.sourceAppBundleId,
                    let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
                         .resizable()
-                        .frame(width: 12, height: 12)
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: clip.type.iconName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.secondary)
                 }
 
                 if let appName = clip.sourceAppName {
                     Text(appName)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.primary.opacity(0.85))
                         .lineLimit(1)
+                } else {
+                    Text(clip.type.displayName)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
                 }
 
                 Spacer()
 
+                if let num = shortcutNumber {
+                    Text("⌘\(num)")
+                        .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                        .padding(.horizontal, 4.5)
+                        .padding(.vertical, 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08))
+                        )
+                        .foregroundColor(isSelected ? .accentColor : .secondary)
+                }
+
+                Text(clip.relativeTimeString)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.secondary.opacity(0.8))
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+
+            Divider()
+                .opacity(0.4)
+
+            // Body Content Area (The iconic Paste preview)
+            ZStack(alignment: .topLeading) {
+                contentPreview
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                    .blur(radius: privacy.isShieldActive ? 14 : 0)
+
+                if privacy.isShieldActive {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 5) {
+                            Image(systemName: "eye.slash.fill")
+                                .font(.system(size: 11))
+                            Text("Protected")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(.ultraThinMaterial))
+                        .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            Divider()
+                .opacity(0.3)
+
+            // Card Footer: Details & Actions
+            HStack(spacing: 6) {
+                // Details (character count, language, ocr)
+                if let lang = clip.detectedLanguage {
+                    HStack(spacing: 3) {
+                        Image(systemName: "curlybraces")
+                            .font(.system(size: 7))
+                        Text(lang)
+                            .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(Capsule().fill(Color.purple.opacity(0.18)))
+                    .foregroundColor(.purple)
+                } else if clip.ocrText != nil {
+                    HStack(spacing: 2) {
+                        Image(systemName: "text.viewfinder")
+                            .font(.system(size: 7))
+                        Text("OCR")
+                            .font(.system(size: 8, weight: .heavy))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(Capsule().fill(Color.blue.opacity(0.18)))
+                    .foregroundColor(.blue)
+                } else if clip.type == .text || clip.type == .richText {
+                    Text("\(clip.plainText.count) chars")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary.opacity(0.75))
+                }
+
+                if clip.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 8))
+                        .foregroundColor(.orange)
+                }
+
+                Spacer()
+
+                // Action buttons on hover / selected
                 if hoverModel.isHovered || isSelected {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         if isDeleted, let onRestore = onRestore {
                             Button(action: onRestore) {
                                 Image(systemName: "arrow.uturn.backward.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                     .foregroundColor(.accentColor)
                             }
                             .buttonStyle(.plain)
@@ -206,74 +216,73 @@ public struct ClipCardView: View {
                         } else {
                             Button(action: onQuickLook) {
                                 Image(systemName: "eye")
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
                             .buttonStyle(.plain)
-                            .help(loc("card.quickLook"))
+                            .help("Quick Look (Space)")
 
                             if clip.type == .text || clip.type == .richText || clip.type == .code {
                                 Button(action: onEdit) {
                                     Image(systemName: "pencil")
-                                        .font(.system(size: 10))
+                                        .font(.system(size: 11))
                                         .foregroundColor(.secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .help(loc("card.edit"))
+                                .help("Edit (⌘E)")
                             }
+
+                            Button(action: onTogglePin) {
+                                Image(systemName: clip.isPinned ? "pin.fill" : "pin")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(clip.isPinned ? .orange : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help(clip.isPinned ? "Unpin clip" : "Pin clip")
                         }
 
                         Button(action: onDelete) {
-                            Image(systemName: isDeleted ? "xmark.circle.fill" : "trash")
-                                .font(.system(size: 10))
-                                .foregroundColor(.red.opacity(0.8))
+                            Image(systemName: "trash")
+                                .font(.system(size: 11))
+                                .foregroundColor(.red.opacity(0.85))
                         }
                         .buttonStyle(.plain)
-                        .help(loc(isDeleted ? "card.permanentlyDelete" : "card.delete"))
+                        .help("Delete (⌫)")
                     }
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.primary.opacity(0.02))
         }
-        .padding(10)
-        .frame(width: 200, height: 140)
+        .frame(width: 220, height: 175)
         .background(
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? Color(nsColor: .controlBackgroundColor)
-                            : (reduceTransparency ? Color(nsColor: .controlBackgroundColor) : Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.95 : 0.90))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.85 : 0.95))
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(.ultraThinMaterial)
                     )
 
                 if isSelected || isMultiSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.12))
-                }
-
-                if clip.isPinned {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.orange.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill((accentColorHex != nil ? Color(hex: accentColorHex!) : Color.accentColor).opacity(0.08))
                 }
             }
         )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(
-                    isSelected || isMultiSelected
-                        ? Color.accentColor
-                        : (clip.isPinned
-                            ? Color.orange.opacity(0.4)
-                            : (hoverModel.isHovered
-                                ? Color.primary.opacity(0.28)
-                                : Color.primary.opacity(colorSchemeContrast == .increased ? 0.35 : 0.15))),
-                    lineWidth: (isSelected || isMultiSelected) ? (colorSchemeContrast == .increased ? 2.5 : 2) : 1
-                )
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(cardBorderColor, lineWidth: (isSelected || isMultiSelected) ? 2 : 1)
         )
         .shadow(
-            color: isSelected ? Color.accentColor.opacity(0.3) : Color.black.opacity(colorScheme == .dark ? 0.25 : 0.08),
-            radius: isSelected ? 5 : 2,
+            color: isSelected
+                ? (accentColorHex != nil ? Color(hex: accentColorHex!) : Color.accentColor).opacity(0.28)
+                : Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08),
+            radius: isSelected ? 8 : 3,
             x: 0,
-            y: 1
+            y: isSelected ? 3 : 1
         )
         .contentShape(Rectangle())
         .onTapGesture {
@@ -310,18 +319,18 @@ public struct ClipCardView: View {
             }
         } else {
             Button(action: onPaste) {
-                Label(loc("context.paste"), systemImage: "arrow.right.doc.on.clipboard")
+                Label("Paste (↵)", systemImage: "arrow.right.doc.on.clipboard")
             }
             Button(action: {
                 PasteService.shared.pasteClip(clip, targetApp: FloatingPanelController.shared.previousApp, forcePlainText: true)
                 FloatingPanelController.shared.hide()
             }) {
-                Label("Paste as Plain Text", systemImage: "doc.text")
+                Label("Paste as Plain Text (⇧↵)", systemImage: "doc.text")
             }
             Button(action: {
                 PasteService.shared.copyToClipboard(clip)
             }) {
-                Label(loc("context.copy"), systemImage: "doc.on.doc")
+                Label("Copy to Clipboard (⌘C)", systemImage: "doc.on.doc")
             }
 
             Divider()
@@ -336,17 +345,15 @@ public struct ClipCardView: View {
                 Label("Rename (⌘R)", systemImage: "character.cursor.ibeam")
             }
 
-            // Assign to Collection Submenu
-            if !StorageService.shared.collections.isEmpty {
-                Menu("Assign to Collection") {
-                    Button("None") {
-                        StorageService.shared.assignClip(clipId: clip.id, to: nil)
-                    }
-                    Divider()
-                    ForEach(StorageService.shared.collections) { col in
-                        Button(col.name) {
-                            StorageService.shared.assignClip(clipId: clip.id, to: col.id)
-                        }
+            // Move to Pinboard Submenu
+            Menu("Move to Pinboard") {
+                Button("Clipboard History (Default)") {
+                    StorageService.shared.assignClip(clipId: clip.id, to: nil)
+                }
+                Divider()
+                ForEach(StorageService.shared.collections) { pinboard in
+                    Button(pinboard.name) {
+                        StorageService.shared.assignClip(clipId: clip.id, to: pinboard.id)
                     }
                 }
             }
@@ -355,21 +362,21 @@ public struct ClipCardView: View {
 
             Button(action: onTogglePin) {
                 Label(
-                    loc(clip.isPinned ? "card.unpin" : "card.pin"),
+                    clip.isPinned ? "Unpin clip" : "Pin clip",
                     systemImage: clip.isPinned ? "pin.slash" : "pin"
                 )
             }
             Button(action: onQuickLook) {
-                Label(loc("card.quickLook"), systemImage: "eye")
+                Label("Quick Look (Space)", systemImage: "eye")
             }
             if clip.type == .text || clip.type == .richText || clip.type == .code {
                 Button(action: onEdit) {
-                    Label(loc("card.edit"), systemImage: "pencil")
+                    Label("Edit (⌘E)", systemImage: "pencil")
                 }
             }
             Divider()
             Button(role: .destructive, action: onDelete) {
-                Label(loc("card.delete"), systemImage: "trash")
+                Label("Delete (⌫)", systemImage: "trash")
             }
         }
     }
@@ -392,25 +399,38 @@ public struct ClipCardView: View {
         }
     }
 
-    private var colorPreview: some View {
-        HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color(hex: clip.colorHex ?? "#000000"))
-                .frame(width: 44, height: 44)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Color.primary.opacity(0.15), lineWidth: 1)
-                )
+    private var textPreview: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(clip.displayTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.primary)
+                .lineLimit(2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(clip.colorHex ?? "#000000")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(.primary)
+            let lines = clip.plainText.components(separatedBy: .newlines).dropFirst()
+            let remainingText = lines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
 
-                Text(loc("card.rgbColor"))
-                    .font(.system(size: 9))
+            if !remainingText.isEmpty {
+                Text(remainingText)
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                    .lineLimit(3)
+                    .lineSpacing(2)
             }
+        }
+    }
+
+    private var codePreview: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(clip.displayTitle)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.purple)
+                .lineLimit(1)
+
+            Text(clip.plainText)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.primary.opacity(0.85))
+                .lineLimit(4)
+                .lineSpacing(2)
         }
     }
 
@@ -418,17 +438,26 @@ public struct ClipCardView: View {
         Group {
             if let filename = clip.imageFileName,
                let nsImage = StorageService.shared.loadImageBlob(named: filename) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 64)
-                    .cornerRadius(4)
+                VStack(spacing: 4) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 74)
+                        .cornerRadius(6)
+
+                    if let ocr = clip.ocrText, !ocr.isEmpty {
+                        Text(ocr)
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             } else {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Image(systemName: "photo")
-                        .font(.system(size: 16))
+                        .font(.system(size: 20))
                         .foregroundColor(.secondary)
-                    Text(loc("filter.images"))
+                    Text("Image")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
@@ -436,11 +465,60 @@ public struct ClipCardView: View {
         }
     }
 
+    private var colorPreview: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(hex: clip.colorHex ?? "#000000"))
+                .frame(width: 52, height: 52)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.primary.opacity(0.18), lineWidth: 1)
+                )
+                .shadow(radius: 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(clip.colorHex ?? "#000000")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundColor(.primary)
+
+                Text("RGB Color Swatch")
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private var linkPreview: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "link")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.blue)
+
+                if let host = URL(string: clip.url ?? clip.plainText)?.host {
+                    Text(host)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.blue)
+                }
+            }
+
+            Text(clip.displayTitle)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.primary)
+                .lineLimit(2)
+
+            Text(clip.url ?? clip.plainText)
+                .font(.system(size: 9.5))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+    }
+
     private var filePreview: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "doc.fill")
-                .font(.system(size: 24))
-                .foregroundColor(.accentColor)
+                .font(.system(size: 30))
+                .foregroundColor(.orange)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(clip.displayTitle)
@@ -455,85 +533,5 @@ public struct ClipCardView: View {
                 }
             }
         }
-    }
-
-    private var linkPreview: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Image(systemName: "link")
-                    .font(.system(size: 10))
-                    .foregroundColor(.blue)
-
-                Text(clip.url ?? clip.plainText)
-                    .font(.system(size: 10, weight: .semibold))
-                    .lineLimit(1)
-                    .foregroundColor(.blue)
-            }
-
-            Text(clip.displayTitle)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-        }
-    }
-
-    private var codePreview: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(clip.displayTitle)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .lineLimit(1)
-                .foregroundColor(.purple)
-
-            Text(clip.plainText)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundColor(.primary.opacity(0.85))
-                .lineLimit(3)
-        }
-    }
-
-    private var textPreview: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(clip.displayTitle)
-                .font(.system(size: 11, weight: .semibold))
-                .lineLimit(1)
-                .foregroundColor(.primary)
-
-            let lines = clip.plainText.components(separatedBy: .newlines).dropFirst()
-            let remainingText = lines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !remainingText.isEmpty {
-                Text(remainingText)
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-        }
-    }
-
-    private var typeColor: Color {
-        switch clip.type {
-        case .color: return .pink
-        case .file: return .orange
-        case .image: return .green
-        case .link: return .blue
-        case .code: return .purple
-        case .text, .richText, .html: return .accentColor
-        }
-    }
-}
-
-private extension Color {
-    init(hex: String) {
-        var cleanHex = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleanHex.hasPrefix("#") { cleanHex.removeFirst() }
-        let scanner = Scanner(string: cleanHex)
-        var rgb: UInt64 = 0
-        scanner.scanHexInt64(&rgb)
-
-        let r = Double((rgb >> 16) & 0xFF) / 255.0
-        let g = Double((rgb >> 8) & 0xFF) / 255.0
-        let b = Double(rgb & 0xFF) / 255.0
-
-        self.init(red: r, green: g, blue: b)
     }
 }
