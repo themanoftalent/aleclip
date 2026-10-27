@@ -157,6 +157,7 @@ public final class FloatingPanelController: ObservableObject {
 
         self.searchText = ""
         self.selectedIndex = 0
+        self.isSearchFocused = false
         self.previewClip = nil
         self.editingClip = nil
         self.renamingClip = nil
@@ -406,13 +407,19 @@ public final class FloatingPanelController: ObservableObject {
                 }
 
             case 49: // Space
-                if !self.isSearchFocused {
+                if !self.isSearchFocused || self.searchText.isEmpty {
                     self.toggleQuickLook()
                     return nil
                 }
 
-            case 51: // Delete / Backspace
-                if !self.isSearchFocused {
+            case 51, 117: // Delete / Backspace (51) & Forward Delete (117)
+                // ⌘⌫ (Command + Delete) ALWAYS deletes selected clip
+                if flags.contains(.command) {
+                    self.deleteSelected()
+                    return nil
+                }
+                // Regular Delete/Backspace deletes selected clip if search is not focused or search query is empty
+                if !self.isSearchFocused || self.searchText.isEmpty {
                     self.deleteSelected()
                     return nil
                 }
@@ -577,6 +584,15 @@ public final class FloatingPanelController: ObservableObject {
     }
 
     public func deleteSelected() {
+        if !multiSelectedIds.isEmpty {
+            let items = filteredClips().filter { multiSelectedIds.contains($0.id) }
+            for item in items {
+                deleteClip(item)
+            }
+            multiSelectedIds.removeAll()
+            return
+        }
+
         let items = filteredClips()
         guard selectedIndex >= 0 && selectedIndex < items.count else { return }
         let toDelete = items[selectedIndex]

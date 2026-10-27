@@ -344,8 +344,11 @@ public struct ClipboardBarView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: 350)
         .onAppear {
+            isSearchFieldFocused = false
+            controller.isSearchFocused = false
             controller.focusSearchTrigger = {
                 isSearchFieldFocused = true
+                controller.isSearchFocused = true
             }
         }
     }
