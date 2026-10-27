@@ -6,6 +6,7 @@ import CryptoKit
 public final class ClipboardMonitor: ObservableObject {
     public static let shared = ClipboardMonitor()
 
+    @Published public var isPaused: Bool = false
     private var timer: Timer?
     private var lastChangeCount: Int = -1
     public var isInternalCopy: Bool = false
@@ -20,6 +21,10 @@ public final class ClipboardMonitor: ObservableObject {
     ]
 
     private init() {}
+
+    public func togglePause() {
+        isPaused.toggle()
+    }
 
     public func start() {
         guard timer == nil else { return }
@@ -39,6 +44,8 @@ public final class ClipboardMonitor: ObservableObject {
     }
 
     private func checkForChanges() {
+        guard !isPaused else { return }
+
         let pasteboard = NSPasteboard.general
         let currentChangeCount = pasteboard.changeCount
 
@@ -77,6 +84,12 @@ public final class ClipboardMonitor: ObservableObject {
         // 3. Extract clip according to type priority
         if let clip = extractClip(from: pasteboard, bundleId: bundleId, appName: appName) {
             StorageService.shared.addClip(clip)
+
+            // If sequential queue is active, add to queue
+            if SequentialPasteService.shared.isQueueActive {
+                SequentialPasteService.shared.addToQueue(clip)
+            }
+
             if StorageService.shared.settings.soundEffects {
                 NSSound(named: "Tink")?.play()
             }
@@ -129,7 +142,7 @@ public final class ClipboardMonitor: ObservableObject {
             if let data = imageData, !data.isEmpty {
                 let hash = hashData(data)
                 if let savedFilename = StorageService.shared.saveImageBlob(data) {
-                    return ClipItem(
+                    let clip = ClipItem(
                         type: .image,
                         plainText: "[Image]",
                         imageFileName: savedFilename,
@@ -137,6 +150,22 @@ public final class ClipboardMonitor: ObservableObject {
                         sourceAppName: appName,
                         contentHash: hash
                     )
+
+                    // Asynchronously trigger OCR text recognition
+                    let clipId = clip.id
+                    Task {
+                        if let ocrText = await OCRService.shared.recognizeText(from: data) {
+                            await MainActor.run {
+                                if let index = StorageService.shared.clips.firstIndex(where: { $0.id == clipId }) {
+                                    var updated = StorageService.shared.clips[index]
+                                    updated.ocrText = ocrText
+                                    StorageService.shared.updateClip(updated)
+                                }
+                            }
+                        }
+                    }
+
+                    return clip
                 }
             }
         }
@@ -184,12 +213,11 @@ public final class ClipboardMonitor: ObservableObject {
             )
         }
 
-        // Priority G: Plain Text
+        // Priority G: Plain Text & Code
         if let string = pasteboard.string(forType: .string) {
             let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
 
-            // Guard against giant text payloads (e.g. 50MB dumps) freezing the UI
             let maxCharacters = 250_000
             let safeString: String
             if string.count > maxCharacters {
@@ -198,27 +226,19 @@ public final class ClipboardMonitor: ObservableObject {
                 safeString = string
             }
 
-            // Check if string is actually a URL
-            if (trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")),
-               let _ = URL(string: trimmed) {
-                let hash = hashString("url:\(trimmed)")
-                return ClipItem(
-                    type: .link,
-                    plainText: trimmed,
-                    url: trimmed,
-                    sourceAppBundleId: bundleId,
-                    sourceAppName: appName,
-                    contentHash: hash
-                )
-            }
+            // Analyze content with ContentDetector
+            let analysis = ContentDetector.shared.analyzeText(safeString)
 
             let hash = hashString("text:\(safeString)")
             return ClipItem(
-                type: .text,
+                type: analysis.detectedType,
                 plainText: safeString,
+                url: analysis.detectedType == .link ? trimmed : nil,
                 sourceAppBundleId: bundleId,
                 sourceAppName: appName,
-                contentHash: hash
+                contentHash: hash,
+                detectedLanguage: analysis.detectedLanguage,
+                isSensitive: analysis.isSensitive
             )
         }
 

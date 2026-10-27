@@ -2,12 +2,15 @@ import Foundation
 import AppKit
 
 public struct AppSettings: Codable, Sendable {
-    public var historyLimit: Int = 200
+    public var historyLimit: Int = 0 // 0 = Unlimited
+    public var unlimitedHistory: Bool = true
     public var pasteIntoActiveApp: Bool = true
     public var plainTextAlways: Bool = false
     public var soundEffects: Bool = true
     public var launchAtLogin: Bool = true
-    public var selectedShortcut: String = "⌥V (Option + V)"
+    public var selectedShortcut: String = "⇧⌘V (Shift + Command + V)"
+    public var screenShieldPrivacy: Bool = false
+    public var maskSensitiveData: Bool = true
     public var excludedBundleIds: [String] = [
         "com.agilebits.onepassword",
         "com.bitwarden.desktop",
@@ -19,12 +22,15 @@ public struct AppSettings: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.historyLimit = try container.decodeIfPresent(Int.self, forKey: .historyLimit) ?? 200
+        self.historyLimit = try container.decodeIfPresent(Int.self, forKey: .historyLimit) ?? 0
+        self.unlimitedHistory = try container.decodeIfPresent(Bool.self, forKey: .unlimitedHistory) ?? (self.historyLimit == 0)
         self.pasteIntoActiveApp = try container.decodeIfPresent(Bool.self, forKey: .pasteIntoActiveApp) ?? true
         self.plainTextAlways = try container.decodeIfPresent(Bool.self, forKey: .plainTextAlways) ?? false
         self.soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
         self.launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? true
-        self.selectedShortcut = try container.decodeIfPresent(String.self, forKey: .selectedShortcut) ?? "⌥V (Option + V)"
+        self.selectedShortcut = try container.decodeIfPresent(String.self, forKey: .selectedShortcut) ?? "⇧⌘V (Shift + Command + V)"
+        self.screenShieldPrivacy = try container.decodeIfPresent(Bool.self, forKey: .screenShieldPrivacy) ?? false
+        self.maskSensitiveData = try container.decodeIfPresent(Bool.self, forKey: .maskSensitiveData) ?? true
         self.excludedBundleIds = try container.decodeIfPresent([String].self, forKey: .excludedBundleIds) ?? [
             "com.agilebits.onepassword",
             "com.bitwarden.desktop",
@@ -40,14 +46,17 @@ public final class StorageService: ObservableObject {
 
     @Published public private(set) var clips: [ClipItem] = []
     @Published public private(set) var deletedClips: [ClipItem] = []
+    @Published public private(set) var collections: [ClipCollection] = []
     @Published public var settings: AppSettings = AppSettings()
 
     private let fileManager = FileManager.default
     private let appSupportURL: URL
     private let historyFileURL: URL
     private let deletedHistoryFileURL: URL
+    private let collectionsFileURL: URL
     private let settingsFileURL: URL
     private let blobsDirectoryURL: URL
+    private let backupsDirectoryURL: URL
 
     private var undoStack: [(clip: ClipItem, originalIndex: Int)] = []
 
@@ -56,11 +65,14 @@ public final class StorageService: ObservableObject {
         self.appSupportURL = appSupport.appendingPathComponent("AleClip", isDirectory: true)
         self.historyFileURL = appSupportURL.appendingPathComponent("history.json")
         self.deletedHistoryFileURL = appSupportURL.appendingPathComponent("deleted_history.json")
+        self.collectionsFileURL = appSupportURL.appendingPathComponent("collections.json")
         self.settingsFileURL = appSupportURL.appendingPathComponent("settings.json")
         self.blobsDirectoryURL = appSupportURL.appendingPathComponent("blobs", isDirectory: true)
+        self.backupsDirectoryURL = appSupportURL.appendingPathComponent("backups", isDirectory: true)
 
         createDirectoriesIfNeeded()
         loadSettings()
+        loadCollections()
         loadHistory()
         loadDeletedHistory()
     }
@@ -68,6 +80,7 @@ public final class StorageService: ObservableObject {
     private func createDirectoriesIfNeeded() {
         try? fileManager.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: blobsDirectoryURL, withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: backupsDirectoryURL, withIntermediateDirectories: true)
     }
 
     // MARK: - History Operations
@@ -91,12 +104,20 @@ public final class StorageService: ObservableObject {
             var existing = clips.remove(at: existingIndex)
             existing.lastUsedAt = Date()
             existing.createdAt = Date() // Move to top of recent
+            if clip.ocrText != nil { existing.ocrText = clip.ocrText }
+            if clip.detectedLanguage != nil { existing.detectedLanguage = clip.detectedLanguage }
             clips.insert(existing, at: 0)
         } else {
             clips.insert(clip, at: 0)
         }
 
         pruneHistoryIfNeeded()
+        scheduleSaveHistory()
+    }
+
+    public func updateClip(_ clip: ClipItem) {
+        guard let index = clips.firstIndex(where: { $0.id == clip.id }) else { return }
+        clips[index] = clip
         scheduleSaveHistory()
     }
 
@@ -119,10 +140,39 @@ public final class StorageService: ObservableObject {
         scheduleSaveHistory()
     }
 
+    public func duplicateClip(id: UUID) {
+        guard let original = clips.first(where: { $0.id == id }) else { return }
+        let duplicate = original
+        let newId = UUID()
+        let copy = ClipItem(
+            id: newId,
+            type: duplicate.type,
+            plainText: duplicate.plainText,
+            htmlContent: duplicate.htmlContent,
+            rtfData: duplicate.rtfData,
+            imageFileName: duplicate.imageFileName,
+            url: duplicate.url,
+            colorHex: duplicate.colorHex,
+            title: (duplicate.title ?? duplicate.displayTitle) + " (Copy)",
+            sourceAppBundleId: duplicate.sourceAppBundleId,
+            sourceAppName: duplicate.sourceAppName,
+            createdAt: Date(),
+            lastUsedAt: Date(),
+            isPinned: false,
+            contentHash: UUID().uuidString,
+            ocrText: duplicate.ocrText,
+            detectedLanguage: duplicate.detectedLanguage,
+            isSensitive: duplicate.isSensitive,
+            collectionId: duplicate.collectionId,
+            sourceDevice: duplicate.sourceDevice
+        )
+        clips.insert(copy, at: 0)
+        scheduleSaveHistory()
+    }
+
     @discardableResult
     public func deleteClip(id: UUID, permanent: Bool = false) -> ClipItem? {
         if permanent {
-            // Check in deletedClips first
             if let index = deletedClips.firstIndex(where: { $0.id == id }) {
                 let removed = deletedClips.remove(at: index)
                 undoStack.removeAll { $0.clip.id == id }
@@ -130,7 +180,6 @@ public final class StorageService: ObservableObject {
                 saveDeletedHistory()
                 return removed
             }
-            // Check in active clips
             if let index = clips.firstIndex(where: { $0.id == id }) {
                 let removed = clips.remove(at: index)
                 undoStack.removeAll { $0.clip.id == id }
@@ -141,17 +190,15 @@ public final class StorageService: ObservableObject {
             return nil
         }
 
-        // Soft deletion: move from clips to deletedClips and push to undoStack
+        // Soft deletion
         guard let index = clips.firstIndex(where: { $0.id == id }) else { return nil }
         let removed = clips.remove(at: index)
 
-        // Push to undo stack (capped at 50)
         undoStack.append((clip: removed, originalIndex: index))
         if undoStack.count > 50 {
             undoStack.removeFirst()
         }
 
-        // Add to deleted clips (at front, capped at 100)
         deletedClips.removeAll { $0.id == removed.id }
         deletedClips.insert(removed, at: 0)
         if deletedClips.count > 100 {
@@ -225,16 +272,64 @@ public final class StorageService: ObservableObject {
         saveDeletedHistory()
     }
 
-    private func cleanupBlobIfNotReferenced(filename: String?) {
-        guard let filename = filename else { return }
-        let referencedInClips = clips.contains { $0.imageFileName == filename }
-        let referencedInDeleted = deletedClips.contains { $0.imageFileName == filename }
-        if !referencedInClips && !referencedInDeleted {
-            deleteBlob(named: filename)
+    // MARK: - Collections Management
+
+    public func addCollection(_ collection: ClipCollection) {
+        collections.removeAll { $0.id == collection.id }
+        collections.append(collection)
+        saveCollections()
+    }
+
+    public func removeCollection(id: UUID) {
+        collections.removeAll { $0.id == id }
+        // Unlink clips
+        for i in clips.indices {
+            if clips[i].collectionId == id {
+                clips[i].collectionId = nil
+            }
+        }
+        saveCollections()
+        scheduleSaveHistory()
+    }
+
+    public func assignClip(clipId: UUID, to collectionId: UUID?) {
+        guard let index = clips.firstIndex(where: { $0.id == clipId }) else { return }
+        clips[index].collectionId = collectionId
+        scheduleSaveHistory()
+    }
+
+    public func saveCollections() {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(collections)
+            try data.write(to: collectionsFileURL, options: .atomic)
+        } catch {
+            print("Failed to save collections: \(error)")
         }
     }
 
+    private func loadCollections() {
+        guard fileManager.fileExists(atPath: collectionsFileURL.path) else { return }
+        do {
+            let data = try Data(contentsOf: collectionsFileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            self.collections = try decoder.decode([ClipCollection].self, from: data)
+        } catch {
+            print("Failed to load collections: \(error)")
+        }
+    }
+
+    // MARK: - History Limit & Pruning
+
     private func pruneHistoryIfNeeded() {
+        // If unlimited history is on or limit is 0, do not prune!
+        if settings.unlimitedHistory || settings.historyLimit <= 0 {
+            return
+        }
+
         guard clips.count > settings.historyLimit else { return }
 
         // Keep pinned clips safe
@@ -242,7 +337,6 @@ public final class StorageService: ObservableObject {
         let overflow = clips.count - settings.historyLimit
 
         if overflow > 0 && !unpinnedIndices.isEmpty {
-            // Move excess oldest unpinned to deletedClips
             let toRemove = unpinnedIndices.suffix(overflow)
             var idsToRemove: Set<UUID> = []
             for idx in toRemove {
@@ -260,6 +354,15 @@ public final class StorageService: ObservableObject {
                 deletedClips = Array(deletedClips.prefix(100))
             }
             saveDeletedHistory()
+        }
+    }
+
+    private func cleanupBlobIfNotReferenced(filename: String?) {
+        guard let filename = filename else { return }
+        let referencedInClips = clips.contains { $0.imageFileName == filename }
+        let referencedInDeleted = deletedClips.contains { $0.imageFileName == filename }
+        if !referencedInClips && !referencedInDeleted {
+            deleteBlob(named: filename)
         }
     }
 
@@ -367,7 +470,22 @@ public final class StorageService: ObservableObject {
         }
     }
 
-    // MARK: - Export & Import
+    // MARK: - Export, Import & Backups
+
+    public func createBackup() -> URL? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let dateString = formatter.string(from: Date())
+        let dest = backupsDirectoryURL.appendingPathComponent("aleclip_backup_\(dateString).json")
+
+        do {
+            try exportJSON(to: dest)
+            return dest
+        } catch {
+            print("Backup failed: \(error)")
+            return nil
+        }
+    }
 
     public func exportJSON(to targetURL: URL) throws {
         let encoder = JSONEncoder()

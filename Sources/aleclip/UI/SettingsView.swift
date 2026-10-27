@@ -4,6 +4,9 @@ import AppKit
 public enum SettingsTab: String, CaseIterable, Identifiable {
     case general = "General"
     case shortcuts = "Shortcuts"
+    case sequential = "Sequential"
+    case mcp = "AI & MCP"
+    case sync = "Cloud Sync"
     case exclusions = "Exclusions"
     case backup = "Backup"
     case about = "About"
@@ -14,6 +17,9 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return loc("settings.tab.general")
         case .shortcuts: return loc("settings.tab.shortcuts")
+        case .sequential: return "Sequential"
+        case .mcp: return "AI & MCP"
+        case .sync: return "Cloud Sync"
         case .exclusions: return loc("settings.tab.exclusions")
         case .backup: return loc("settings.tab.backup")
         case .about: return loc("settings.tab.about")
@@ -24,8 +30,11 @@ public enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape.fill"
         case .shortcuts: return "keyboard.fill"
+        case .sequential: return "list.number"
+        case .mcp: return "sparkles"
+        case .sync: return "arrow.triangle.2.circlepath.icloud.fill"
         case .exclusions: return "hand.raised.fill"
-        case .backup: return "arrow.triangle.2.circlepath"
+        case .backup: return "externaldrive.fill"
         case .about: return "info.circle.fill"
         }
     }
@@ -52,6 +61,9 @@ final class SettingsViewModel: ObservableObject {
 public struct SettingsView: View {
     @ObservedObject private var storage = StorageService.shared
     @ObservedObject private var l10n = LocalizationService.shared
+    @ObservedObject private var seqQueue = SequentialPasteService.shared
+    @ObservedObject private var cloudSync = CloudSyncService.shared
+    @ObservedObject private var privacy = ScreenPrivacyService.shared
     @StateObject private var model = SettingsViewModel()
 
     public init() {}
@@ -75,6 +87,12 @@ public struct SettingsView: View {
                         generalContent
                     case .shortcuts:
                         shortcutsContent
+                    case .sequential:
+                        sequentialContent
+                    case .mcp:
+                        mcpContent
+                    case .sync:
+                        syncContent
                     case .exclusions:
                         exclusionsContent
                     case .backup:
@@ -88,7 +106,7 @@ public struct SettingsView: View {
             }
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
         }
-        .frame(width: 620, height: 530)
+        .frame(width: 680, height: 560)
         .alert(item: $model.activeAlert) { item in
             switch item {
             case .info(let message):
@@ -113,24 +131,24 @@ public struct SettingsView: View {
     // MARK: - Top Tab Bar
 
     private var topTabBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(SettingsTab.allCases) { tab in
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.12)) {
                         model.selectedTab = tab
                     }
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: tab.iconName)
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                         Text(tab.title)
-                            .font(.system(size: 13, weight: model.selectedTab == tab ? .semibold : .regular))
+                            .font(.system(size: 12, weight: model.selectedTab == tab ? .semibold : .regular))
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
                     .foregroundColor(model.selectedTab == tab ? .white : .primary)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(model.selectedTab == tab ? Color.accentColor : Color.clear)
                     )
                 }
@@ -144,68 +162,59 @@ public struct SettingsView: View {
 
     private var generalContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            // Language Picker Card
-            settingsCard(title: loc("settings.general.language"), icon: "globe") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(loc("settings.general.language") + ":")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Picker("", selection: Binding(
-                            get: { LocalizationService.shared.getSelectedLanguageSetting() },
-                            set: { newValue in
-                                LocalizationService.shared.setLanguage(newValue)
-                                model.activeAlert = .languageRestart
+            // History Limits & Unlimited Card
+            settingsCard(title: "Clipboard History Capacity", icon: "clock.arrow.circlepath") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("Unlimited Clipboard History", isOn: $storage.settings.unlimitedHistory)
+                        .font(.system(size: 13, weight: .medium))
+                        .onChange(of: storage.settings.unlimitedHistory) { _, newValue in
+                            if newValue {
+                                storage.settings.historyLimit = 0
+                            } else if storage.settings.historyLimit == 0 {
+                                storage.settings.historyLimit = 200
                             }
-                        )) {
-                            Text(loc("settings.general.langSystem")).tag("system")
-                            Text(loc("settings.general.langEn")).tag("en")
-                            Text(loc("settings.general.langTr")).tag("tr")
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 200)
-                    }
-                }
-            }
-
-            // System Startup Card
-            settingsCard(title: loc("settings.general.startup"), icon: "power") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle(loc("settings.general.launchAtLogin"), isOn: $storage.settings.launchAtLogin)
-                        .font(.system(size: 13))
-                        .onChange(of: storage.settings.launchAtLogin) { _, newValue in
                             storage.saveSettings()
-                            LaunchAtLoginManager.shared.setEnabled(newValue)
                         }
 
-                    Text(loc("settings.general.launchAtLoginHelp"))
+                    if !storage.settings.unlimitedHistory {
+                        HStack {
+                            Text(loc("settings.general.maxItems"))
+                                .font(.system(size: 13))
+                            Spacer()
+                            Picker("", selection: $storage.settings.historyLimit) {
+                                Text("50 clips").tag(50)
+                                Text("100 clips").tag(100)
+                                Text("200 clips").tag(200)
+                                Text("500 clips").tag(500)
+                                Text("1,000 clips").tag(1000)
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 140)
+                            .onChange(of: storage.settings.historyLimit) { _, _ in
+                                storage.saveSettings()
+                            }
+                        }
+                    }
+
+                    Text("When unlimited is enabled, all copied text, links, code, images, and colors are saved without losing previous entries.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
 
-            // History Limits Card
-            settingsCard(title: loc("settings.general.historyLimits"), icon: "clock.arrow.circlepath") {
+            // Privacy & Sensitive Data Card
+            settingsCard(title: "Privacy Controls", icon: "shield.lefthalf.filled") {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text(loc("settings.general.maxItems"))
-                            .font(.system(size: 13))
-                        Spacer()
-                        Picker("", selection: $storage.settings.historyLimit) {
-                            Text(locF("footer.clips", 50)).tag(50)
-                            Text(locF("footer.clips", 100)).tag(100)
-                            Text(locF("footer.clips", 200)).tag(200)
-                            Text(locF("footer.clips", 500)).tag(500)
-                            Text(locF("footer.clips", 1000)).tag(1000)
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 140)
-                        .onChange(of: storage.settings.historyLimit) { _, _ in
+                    Toggle("Screen-Sharing Privacy (Auto-hide during screen sharing & presentations)", isOn: $privacy.autoShieldOnScreenShare)
+                        .font(.system(size: 13))
+
+                    Toggle("Automatically detect & mask sensitive info (API keys, tokens, credit cards)", isOn: $storage.settings.maskSensitiveData)
+                        .font(.system(size: 13))
+                        .onChange(of: storage.settings.maskSensitiveData) { _, _ in
                             storage.saveSettings()
                         }
-                    }
 
-                    Text(loc("settings.general.historyHelp"))
+                    Text("Sensitive pasteboards (such as password manager transients) are automatically ignored.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -220,42 +229,6 @@ public struct SettingsView: View {
                             storage.saveSettings()
                         }
 
-                    if storage.settings.pasteIntoActiveApp {
-                        HStack(spacing: 8) {
-                            Image(systemName: PasteService.shared.isAccessibilityTrusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                                .foregroundColor(PasteService.shared.isAccessibilityTrusted ? .green : .orange)
-                                .font(.system(size: 15))
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(loc(PasteService.shared.isAccessibilityTrusted ? "settings.general.accessGranted" : "settings.general.accessRequired"))
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text(loc(PasteService.shared.isAccessibilityTrusted ? "settings.general.accessGrantedDesc" : "settings.general.accessRequiredDesc"))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-
-                            if !PasteService.shared.isAccessibilityTrusted {
-                                Button(loc("settings.general.openSysSettings")) {
-                                    PasteService.shared.promptAccessibilityIfNeeded()
-                                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                                        NSWorkspace.shared.open(url)
-                                    }
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                            }
-                        }
-                        .padding(10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(nsColor: .windowBackgroundColor))
-                        )
-                    }
-
-                    Divider()
-
                     Toggle(loc("settings.general.plainTextAlways"), isOn: $storage.settings.plainTextAlways)
                         .font(.system(size: 13))
                         .onChange(of: storage.settings.plainTextAlways) { _, _ in
@@ -264,13 +237,22 @@ public struct SettingsView: View {
                 }
             }
 
-            // Sound Effects Card
-            settingsCard(title: loc("settings.general.audioFeedback"), icon: "speaker.wave.2") {
-                Toggle(loc("settings.general.soundEffects"), isOn: $storage.settings.soundEffects)
-                    .font(.system(size: 13))
-                    .onChange(of: storage.settings.soundEffects) { _, _ in
-                        storage.saveSettings()
-                    }
+            // Startup & Sound
+            settingsCard(title: "Startup & Feedback", icon: "power") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(loc("settings.general.launchAtLogin"), isOn: $storage.settings.launchAtLogin)
+                        .font(.system(size: 13))
+                        .onChange(of: storage.settings.launchAtLogin) { _, newValue in
+                            storage.saveSettings()
+                            LaunchAtLoginManager.shared.setEnabled(newValue)
+                        }
+
+                    Toggle(loc("settings.general.soundEffects"), isOn: $storage.settings.soundEffects)
+                        .font(.system(size: 13))
+                        .onChange(of: storage.settings.soundEffects) { _, _ in
+                            storage.saveSettings()
+                        }
+                }
             }
         }
     }
@@ -279,11 +261,10 @@ public struct SettingsView: View {
 
     private var shortcutsContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            // Global Hotkey Card
-            settingsCard(title: loc("settings.shortcuts.globalTitle"), icon: "command") {
+            settingsCard(title: "Global Panel Shortcut", icon: "command") {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text(loc("settings.shortcuts.globalDesc"))
+                        Text("Open Clipboard History:")
                             .font(.system(size: 13))
                         Spacer()
                         Picker("", selection: $storage.settings.selectedShortcut) {
@@ -292,62 +273,189 @@ public struct SettingsView: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        .frame(width: 220)
+                        .frame(width: 240)
                         .onChange(of: storage.settings.selectedShortcut) { _, _ in
                             storage.saveSettings()
                             HotkeyManager.shared.applyConfiguredHotkey()
                         }
                     }
-
-                    Text(loc("settings.shortcuts.globalHelp"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
             }
 
-            // Keyboard Shortcuts Guide Card
-            settingsCard(title: loc("settings.shortcuts.guideTitle"), icon: "keyboard") {
+            settingsCard(title: "Configured Keyboard Shortcuts", icon: "keyboard") {
                 VStack(spacing: 8) {
-                    shortcutRow(keys: ["⌥", "V"], action: loc("settings.shortcuts.togglePanel"))
-                    shortcutRow(keys: ["←", "→"], action: loc("settings.shortcuts.navigateCards"))
-                    shortcutRow(keys: ["↵"], action: loc("settings.shortcuts.pasteClip"))
-                    shortcutRow(keys: ["⇧", "↵"], action: loc("settings.shortcuts.plainPaste"))
-                    shortcutRow(keys: ["Space"], action: loc("settings.shortcuts.quickLook"))
-                    shortcutRow(keys: ["⌘", "E"], action: loc("settings.shortcuts.editClip"))
-                    shortcutRow(keys: ["⌫"], action: loc("settings.shortcuts.deleteClip"))
-                    shortcutRow(keys: ["⌘", "Z"], action: loc("settings.shortcuts.undoDelete"))
-                    shortcutRow(keys: ["Esc"], action: loc("settings.shortcuts.dismissPanel"))
+                    shortcutRow(keys: ["⇧", "⌘", "V"], action: "Open clipboard history")
+                    shortcutRow(keys: ["⌘", "F"], action: "Search clipboard")
+                    shortcutRow(keys: ["⌘", "E"], action: "Edit selected item")
+                    shortcutRow(keys: ["⌘", "R"], action: "Rename selected item")
+                    shortcutRow(keys: ["⇧", "⌘", "N"], action: "Create new collection")
+                    shortcutRow(keys: ["⌘", "N"], action: "Create new text item")
+                    shortcutRow(keys: ["⌘", "T"], action: "Pause clipboard monitoring")
+                    shortcutRow(keys: ["Space"], action: "Preview selected item (Quick Look)")
+                    shortcutRow(keys: ["⌘", "1...9"], action: "Quick Paste items 1 to 9")
+                    shortcutRow(keys: ["⇧", "↵"], action: "Paste as Plain Text")
+                    shortcutRow(keys: ["⌘", "Z"], action: "Undo last deletion")
+                    shortcutRow(keys: ["Esc"], action: "Dismiss panel")
                 }
             }
         }
     }
 
-    private func shortcutRow(keys: [String], action: String) -> some View {
-        HStack {
-            Text(action)
-                .font(.system(size: 12))
-                .foregroundColor(.primary)
+    // MARK: - Sequential Paste Content
 
-            Spacer()
+    private var sequentialContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            settingsCard(title: "Sequential Copy & Paste (Queue Mode)", icon: "list.number") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle("Enable Sequential Copy & Paste Queue", isOn: $seqQueue.isQueueActive)
+                        .font(.system(size: 13, weight: .semibold))
 
-            HStack(spacing: 4) {
-                ForEach(keys, id: \.self) { key in
-                    Text(key)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(nsColor: .windowBackgroundColor))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(Color.primary.opacity(0.15), lineWidth: 1)
-                        )
+                    Text("When active, copied items enter a queue. Pasting automatically inserts each item in order (FIFO or LIFO) and advances to the next.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Divider()
+
+                    HStack {
+                        Text("Queue Mode:")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: $seqQueue.isFIFO) {
+                            Text("First-In First-Out (FIFO)").tag(true)
+                            Text("Last-In First-Out (LIFO)").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 250)
+                    }
+
+                    if !seqQueue.queue.isEmpty {
+                        HStack {
+                            Text("Currently Queued: \(seqQueue.queue.count) items")
+                                .font(.caption.bold())
+                            Spacer()
+                            Button("Clear Queue") {
+                                seqQueue.clearQueue()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    }
                 }
             }
         }
-        .padding(.vertical, 3)
+    }
+
+    // MARK: - AI & MCP Content
+
+    private var mcpContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            settingsCard(title: "Model Context Protocol (MCP) Integration", icon: "sparkles") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("AleClip includes native Model Context Protocol (MCP) server support, allowing AI assistants in Claude Desktop, Cursor, VS Code, and Codex to access clipboard history, perform OCR search, and insert clips.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+
+                    Divider()
+
+                    Text("How to Connect with Claude Desktop & Cursor:")
+                        .font(.caption.bold())
+
+                    Text("""
+Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "aleclip": {
+      "command": "/Applications/AleClip.app/Contents/MacOS/aleclip",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+""")
+                    .font(.system(size: 11, design: .monospaced))
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+                    .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    // MARK: - Cloud Sync Content
+
+    private var syncContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            settingsCard(title: "Cloud Synchronization", icon: "arrow.triangle.2.circlepath.icloud.fill") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Synchronize your clipboard history and collections securely across your Mac, iPhone, iPad, and other devices via iCloud Drive / Cloud container.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+
+                    HStack {
+                        Button("Sync Now") {
+                            cloudSync.syncNow()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Spacer()
+
+                        Text(cloudSync.syncStatusMessage)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            settingsCard(title: "Shared Collections", icon: "folder.badge.plus") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Export collections into shareable `.aleclipcollection` bundles for team collaboration or import shared collections from peers.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 12) {
+                        Button("Export Collection Bundle…") {
+                            exportFirstCollection()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(storage.collections.isEmpty)
+
+                        Button("Import Shared Collection…") {
+                            importSharedCollection()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+
+    private func exportFirstCollection() {
+        guard let col = storage.collections.first else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "\(col.name).aleclipcollection.json"
+        if panel.runModal() == .OK, let url = panel.url {
+            let colClips = storage.clips.filter { $0.collectionId == col.id }
+            try? cloudSync.exportCollection(col, clips: colClips, to: url)
+            model.activeAlert = .info("Exported collection '\(col.name)' successfully.")
+        }
+    }
+
+    private func importSharedCollection() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                let res = try cloudSync.importCollection(from: url)
+                if let col = res.collection {
+                    model.activeAlert = .info("Imported collection '\(col.name)' with \(res.count) items.")
+                }
+            } catch {
+                model.activeAlert = .info("Failed to import collection: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Exclusions Content
@@ -360,70 +468,39 @@ public struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    // App List
                     ScrollView {
                         VStack(spacing: 6) {
-                            if storage.settings.excludedBundleIds.isEmpty {
-                                Text(loc("settings.exclusions.empty"))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding()
-                            } else {
-                                ForEach(storage.settings.excludedBundleIds, id: \.self) { bundleId in
-                                    HStack {
-                                        Image(systemName: "app.dashed")
-                                            .foregroundColor(.secondary)
-                                        Text(bundleId)
-                                            .font(.system(size: 12, design: .monospaced))
-                                        Spacer()
-                                        Button(action: {
-                                            storage.settings.excludedBundleIds.removeAll { $0 == bundleId }
-                                            storage.saveSettings()
-                                        }) {
-                                            Image(systemName: "trash")
-                                                .font(.system(size: 11))
-                                                .foregroundColor(.red.opacity(0.8))
-                                        }
-                                        .buttonStyle(.plain)
+                            ForEach(storage.settings.excludedBundleIds, id: \.self) { bundleId in
+                                HStack {
+                                    Image(systemName: "app.dashed")
+                                        .foregroundColor(.secondary)
+                                    Text(bundleId)
+                                        .font(.system(size: 12, design: .monospaced))
+                                    Spacer()
+                                    Button(action: {
+                                        storage.settings.excludedBundleIds.removeAll { $0 == bundleId }
+                                        storage.saveSettings()
+                                    }) {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.red.opacity(0.8))
                                     }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(Color(nsColor: .windowBackgroundColor))
-                                    )
+                                    .buttonStyle(.plain)
                                 }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .windowBackgroundColor)))
                             }
                         }
                     }
                     .frame(height: 140)
 
-                    Divider()
-
-                    // Add Buttons
                     HStack(spacing: 8) {
                         Button(loc("settings.exclusions.chooseApp")) {
                             chooseApplication()
                         }
                         .buttonStyle(.bordered)
-
                         Spacer()
-                    }
-
-                    HStack(spacing: 8) {
-                        TextField(loc("settings.exclusions.enterBundle"), text: $model.newBundleId)
-                            .textFieldStyle(.roundedBorder)
-
-                        Button(loc("settings.exclusions.add")) {
-                            let trimmed = model.newBundleId.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
-                            if !storage.settings.excludedBundleIds.contains(trimmed) {
-                                storage.settings.excludedBundleIds.append(trimmed)
-                                storage.saveSettings()
-                            }
-                            model.newBundleId = ""
-                        }
-                        .disabled(model.newBundleId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
             }
@@ -434,7 +511,6 @@ public struct SettingsView: View {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.application]
         panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         if panel.runModal() == .OK {
             for url in panel.urls {
@@ -452,23 +528,36 @@ public struct SettingsView: View {
 
     private var backupContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            settingsCard(title: loc("settings.backup.title"), icon: "arrow.triangle.2.circlepath") {
+            settingsCard(title: loc("settings.backup.title"), icon: "externaldrive.fill") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(loc("settings.backup.help"))
                         .font(.caption)
                         .foregroundColor(.secondary)
 
                     HStack(spacing: 12) {
+                        Button("Quick Backup Now") {
+                            if let url = storage.createBackup() {
+                                model.activeAlert = .info("Backup saved to:\n\(url.lastPathComponent)")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+
                         Button(loc("settings.backup.exportBtn")) {
                             exportHistory()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
 
                         Button(loc("settings.backup.importBtn")) {
                             importHistory()
                         }
                         .buttonStyle(.bordered)
                     }
+
+                    Divider()
+
+                    Text("Automatic Recovery: In the unlikely event of system corruption or crash, AleClip automatically preserves previous history files with timestamped `.bak` archives and restores active history safely.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -537,7 +626,7 @@ public struct SettingsView: View {
             VStack(spacing: 3) {
                 Text("AleClip")
                     .font(.system(size: 20, weight: .bold))
-                Text(locF("about.version", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "2026"))
+                Text(locF("about.version", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1.0", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "2026"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -562,9 +651,6 @@ public struct SettingsView: View {
                 Text(loc("settings.about.localOnly"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                Text(loc("settings.about.techStack"))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
 
             Spacer().frame(height: 10)
@@ -572,7 +658,27 @@ public struct SettingsView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Reusable Settings Card
+    private func shortcutRow(keys: [String], action: String) -> some View {
+        HStack {
+            Text(action)
+                .font(.system(size: 12))
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                ForEach(keys, id: \.self) { key in
+                    Text(key)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color(nsColor: .windowBackgroundColor)))
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.primary.opacity(0.15), lineWidth: 1))
+                }
+            }
+        }
+        .padding(.vertical, 2.5)
+    }
 
     private func settingsCard<Content: View>(title: String, icon: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {

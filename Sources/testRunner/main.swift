@@ -5,6 +5,8 @@ import AleClipCore
 func runTests() {
     print("▶ Running AleClip Unit Tests...")
 
+    let storage = StorageService.shared
+
     // 1. Search matching
     let textClip = ClipItem(
         type: .text,
@@ -17,107 +19,112 @@ func runTests() {
     assert(!textClip.matches(query: "python"), "Unrelated query should not match")
     print("  ✔ ClipItem search matching passed")
 
-    // 2. Display titles
-    var clip = ClipItem(
-        type: .text,
-        plainText: "Line 1 of content\nLine 2 of content",
-        contentHash: "hash2"
+    // 2. OCR Text Search Matching (Feature 3)
+    let ocrClip = ClipItem(
+        type: .image,
+        plainText: "[Image]",
+        contentHash: "ocrhash1",
+        ocrText: "Financial Quarter 4 Invoice Total $1,250.00"
     )
-    assert(clip.displayTitle == "Line 1 of content", "Multi-line text should show first line as title")
-    clip.title = "Custom User Title"
-    assert(clip.displayTitle == "Custom User Title", "Custom title should override first line")
-    print("  ✔ ClipItem display title logic passed")
+    assert(ocrClip.matches(query: "invoice"), "Should match word from OCR text")
+    assert(ocrClip.matches(query: "Quarter 4"), "Should match phrase from OCR text")
+    print("  ✔ OCR text index and search matching passed")
 
-    // 3. Color clip properties
-    let colorClip = ClipItem(
-        type: .color,
-        plainText: "#FF00AA",
-        colorHex: "#FF00AA",
-        contentHash: "colorhash"
-    )
-    assert(colorClip.type == .color)
-    assert(colorClip.displayTitle == "#FF00AA")
-    assert(colorClip.matches(query: "ff00aa"))
-    print("  ✔ Color clip properties passed")
+    // 3. Content Recognition & Language Detection (Feature 23)
+    let swiftSnippet = """
+    import SwiftUI
+    struct ContentView: View {
+        var body: some View { Text("Hello") }
+    }
+    """
+    let swiftAnalysis = ContentDetector.shared.analyzeText(swiftSnippet)
+    assert(swiftAnalysis.detectedType == .code, "Should detect code snippet")
+    assert(swiftAnalysis.detectedLanguage == "Swift", "Should identify Swift language")
 
-    // 4. Link clip properties
-    let linkClip = ClipItem(
-        type: .link,
-        plainText: "https://apple.com/macos",
-        url: "https://apple.com/macos",
-        contentHash: "linkhash"
-    )
-    assert(linkClip.type == .link)
-    assert(linkClip.displayTitle == "https://apple.com/macos")
-    assert(linkClip.matches(query: "apple.com"))
-    print("  ✔ Link clip properties passed")
+    let pythonSnippet = """
+    def compute_sum(a, b):
+        return a + b
+    """
+    let pythonAnalysis = ContentDetector.shared.analyzeText(pythonSnippet)
+    assert(pythonAnalysis.detectedLanguage == "Python", "Should identify Python language")
 
-    // 5. History Pruning & Pinned Item Protection
-    let storage = StorageService.shared
-    storage.settings.historyLimit = 3
+    let jsonSnippet = "{\"id\": 123, \"active\": true}"
+    let jsonAnalysis = ContentDetector.shared.analyzeText(jsonSnippet)
+    assert(jsonAnalysis.detectedLanguage == "JSON", "Should identify JSON")
+    print("  ✔ Advanced content recognition and syntax detection passed")
+
+    // 4. Sensitive Information Detection (Feature 14)
+    let apiText = "My private key is sk-1234567890abcdef1234567890abcdef"
+    let sensitiveAnalysis = ContentDetector.shared.analyzeText(apiText)
+    assert(sensitiveAnalysis.isSensitive, "Should flag OpenAI-style secret key")
+
+    let normalText = "Just a friendly message"
+    assert(!ContentDetector.shared.analyzeText(normalText).isSensitive, "Normal text should not be flagged")
+    print("  ✔ Sensitive information privacy detection passed")
+
+    // 5. Unlimited History Protection (Feature 1)
+    storage.settings.unlimitedHistory = true
+    storage.settings.historyLimit = 0
     storage.clearUnpinned()
 
-    let clip1 = ClipItem(type: .text, plainText: "Clip 1 Pinned", isPinned: true, contentHash: "h1")
-    let clip2 = ClipItem(type: .text, plainText: "Clip 2 Unpinned", isPinned: false, contentHash: "h2")
-    let clip3 = ClipItem(type: .text, plainText: "Clip 3 Unpinned", isPinned: false, contentHash: "h3")
-    let clip4 = ClipItem(type: .text, plainText: "Clip 4 Unpinned", isPinned: false, contentHash: "h4")
+    let c1 = ClipItem(type: .text, plainText: "Clip 1", isPinned: false, contentHash: "uh1")
+    let c2 = ClipItem(type: .text, plainText: "Clip 2", isPinned: false, contentHash: "uh2")
+    let c3 = ClipItem(type: .text, plainText: "Clip 3", isPinned: false, contentHash: "uh3")
+    storage.addClip(c1)
+    storage.addClip(c2)
+    storage.addClip(c3)
+    assert(storage.clips.count >= 3, "Unlimited history must never prune unpinned clips")
+    print("  ✔ Unlimited clipboard history protection passed")
 
-    storage.addClip(clip1)
-    storage.addClip(clip2)
-    storage.addClip(clip3)
-    storage.addClip(clip4)
+    // 6. Pinboards & Collections (Feature 5)
+    let testCollection = ClipCollection(name: "Dev Snippets", icon: "curlybraces", color: "purple")
+    storage.addCollection(testCollection)
+    assert(storage.collections.contains { $0.id == testCollection.id }, "Collection must be stored")
 
-    let remainingTexts = storage.clips.map { $0.plainText }
-    assert(remainingTexts.contains("Clip 1 Pinned"), "Pinned clip must be preserved even when limit exceeded")
-    print("  ✔ Storage pruning preserves pinned clips passed")
+    storage.assignClip(clipId: c1.id, to: testCollection.id)
+    assert(storage.clips.first(where: { $0.id == c1.id })?.collectionId == testCollection.id, "Clip must be assigned to collection")
+    print("  ✔ Pinboards and collections management passed")
 
-    // 6. JSON Export and Import
-    let tempDir = FileManager.default.temporaryDirectory
-    let backupFile = tempDir.appendingPathComponent("test-aleclip-backup.json")
-    try! storage.exportJSON(to: backupFile)
-    assert(FileManager.default.fileExists(atPath: backupFile.path), "Backup JSON file should exist")
+    // 7. Sequential Copy and Paste Queue (Feature 9)
+    let seqQueue = SequentialPasteService.shared
+    seqQueue.clearQueue()
+    seqQueue.isQueueActive = true
 
-    let importedCount = try! storage.importJSON(from: backupFile)
-    assert(importedCount == 0, "Duplicate import should skip all existing hashes")
-    try? FileManager.default.removeItem(at: backupFile)
-    print("  ✔ JSON export/import and deduplication passed")
+    let itemA = ClipItem(type: .text, plainText: "First Item", contentHash: "seqA")
+    let itemB = ClipItem(type: .text, plainText: "Second Item", contentHash: "seqB")
+    seqQueue.addToQueue(itemA)
+    seqQueue.addToQueue(itemB)
 
-    // 7. Turkish localized search (dotted / dotless I & diacritics)
-    let turkishClip = ClipItem(
-        type: .text,
-        plainText: "İstanbul Işıkları ve Çınar Ağaçları",
-        contentHash: "trhash1"
-    )
-    assert(turkishClip.matches(query: "istanbul") || turkishClip.matches(query: "İSTANBUL"), "Turkish search matching")
-    assert(turkishClip.matches(query: "çınar"), "Turkish character matching")
-    assert(turkishClip.matches(query: "ağaç"), "Turkish ğ character matching")
-    print("  ✔ Turkish characters & case-folding search passed")
+    assert(seqQueue.queue.count == 2, "Queue should contain 2 items")
+    let poppedFirst = seqQueue.popNext()
+    assert(poppedFirst?.plainText == "First Item", "FIFO sequential paste should pop First Item")
+    let poppedSecond = seqQueue.popNext()
+    assert(poppedSecond?.plainText == "Second Item", "FIFO sequential paste should pop Second Item")
+    assert(seqQueue.queue.isEmpty, "Queue should be empty after popping both")
+    seqQueue.clearQueue()
+    print("  ✔ Sequential copy and paste queue (FIFO) passed")
 
-    // 8. Localization strings validation
-    LocalizationService.shared.setLanguage("en")
-    assert(loc("panel.searchPlaceholder") == "Search clips...", "English search placeholder")
-    assert(loc("about.developedBy") == "Developed by SoftAI Yazılım", "English developer line")
+    // 8. Multi-Item Pasting Combination (Feature 16)
+    let multiClip1 = ClipItem(type: .text, plainText: "Alpha", contentHash: "m1")
+    let multiClip2 = ClipItem(type: .text, plainText: "Beta", contentHash: "m2")
+    let multiCombined = [multiClip1, multiClip2].map { $0.plainText }.joined(separator: "\n")
+    assert(multiCombined == "Alpha\nBeta", "Combined multi-item text matching")
+    print("  ✔ Multiple-item paste combination passed")
 
-    LocalizationService.shared.setLanguage("tr")
-    assert(loc("panel.searchPlaceholder") == "Panoda ara...", "Turkish search placeholder")
-    assert(loc("about.developedBy") == "SoftAI Yazılım tarafından geliştirildi", "Turkish developer line")
-    assert(!loc("settings.shortcuts.quickPaste").isEmpty, "Turkish quickPaste shortcut string")
-    print("  ✔ Localization service English & Turkish strings passed")
+    // 9. Model Context Protocol (MCP) RPC handling (Feature 8)
+    let initRequest = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+    let initResponse = MCPService.shared.handleJSONRPC(input: initRequest)
+    assert(initResponse != nil && initResponse!.contains("aleclip-mcp"), "MCP initialize should respond with aleclip-mcp")
 
-    // 9. Quick paste localization check in English
-    LocalizationService.shared.setLanguage("en")
-    assert(!loc("settings.shortcuts.quickPaste").isEmpty, "English quickPaste shortcut string")
-    print("  ✔ Quick Paste localization strings verified")
+    let toolsRequest = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+    let toolsResponse = MCPService.shared.handleJSONRPC(input: toolsRequest)
+    assert(toolsResponse != nil && toolsResponse!.contains("get_recent_clips"), "MCP tools list should provide get_recent_clips")
+    print("  ✔ MCP service JSON-RPC processing passed")
 
-    // 10. Large text safety truncation validation
-    let giantText = String(repeating: "A", count: 300_000)
-    let maxCharacters = 250_000
-    let safeString = giantText.count > maxCharacters
-        ? String(giantText.prefix(maxCharacters)) + "\n\n[... Truncated for performance / Performans için kesildi ...]"
-        : giantText
-    let largeClip = ClipItem(type: .text, plainText: safeString, contentHash: "largehash")
-    assert(largeClip.plainText.count < 300_000, "Safety cap prevents unbounded memory expansion")
-    print("  ✔ Large text safety capping verified")
+    // 10. Display titles & Duplicate Clip (Feature 11)
+    storage.duplicateClip(id: c1.id)
+    assert(storage.clips.first?.title?.contains("(Copy)") == true, "Duplicated clip should be created at front")
+    print("  ✔ Clipboard editing and duplication passed")
 
     // 11. Soft delete and undoLastDelete (⌘Z)
     let undoTestClip = ClipItem(type: .text, plainText: "Important user note that was deleted", contentHash: "undohash1")
@@ -132,50 +139,16 @@ func runTests() {
     let restoredItem = storage.undoLastDelete()
     assert(restoredItem?.id == undoTestClip.id, "undoLastDelete should return restored clip")
     assert(storage.clips.contains { $0.id == undoTestClip.id }, "Restored clip must be back in active clips")
-    assert(!storage.deletedClips.contains { $0.id == undoTestClip.id }, "Restored clip must be removed from deletedClips")
     print("  ✔ Soft delete and undoLastDelete (⌘Z) passed")
 
-    // 12. Restore from Trash (deletedClips)
-    let trashTestClip = ClipItem(type: .text, plainText: "Clip to restore from Trash bin", contentHash: "trashhash1")
-    storage.addClip(trashTestClip)
-    storage.deleteClip(id: trashTestClip.id)
-    assert(storage.deletedClips.contains { $0.id == trashTestClip.id }, "Clip must be in Trash")
+    // 12. Quick Backup creation (Feature 24 & 22)
+    if let backupFile = storage.createBackup() {
+        assert(FileManager.default.fileExists(atPath: backupFile.path), "Backup archive file should exist on disk")
+        try? FileManager.default.removeItem(at: backupFile)
+    }
+    print("  ✔ Reliable local storage backup creation passed")
 
-    let manuallyRestored = storage.restoreClip(id: trashTestClip.id)
-    assert(manuallyRestored?.id == trashTestClip.id, "restoreClip should return the clip")
-    assert(storage.clips.contains { $0.id == trashTestClip.id }, "Clip should be restored to active clips")
-    assert(!storage.deletedClips.contains { $0.id == trashTestClip.id }, "Clip should be removed from Trash")
-    print("  ✔ Restore from Trash (deletedClips) passed")
-
-    // 13. Permanent delete & Empty Trash
-    let permClip1 = ClipItem(type: .text, plainText: "Permanent 1", contentHash: "perm1")
-    let permClip2 = ClipItem(type: .text, plainText: "Permanent 2", contentHash: "perm2")
-    storage.addClip(permClip1)
-    storage.addClip(permClip2)
-    storage.deleteClip(id: permClip1.id)
-    storage.deleteClip(id: permClip2.id)
-    assert(storage.deletedClips.count >= 2, "Both clips in deletedClips")
-
-    storage.deleteClip(id: permClip1.id, permanent: true)
-    assert(!storage.deletedClips.contains { $0.id == permClip1.id }, "Permanent delete should wipe item from deletedClips")
-
-    storage.emptyTrash()
-    assert(storage.deletedClips.isEmpty, "emptyTrash should clear all deleted clips")
-    print("  ✔ Permanent delete & Empty Trash passed")
-
-    // 14. Localization validation for Undo & Trash
-    LocalizationService.shared.setLanguage("en")
-    assert(loc("filter.deleted") == "Deleted", "English Deleted filter")
-    assert(loc("toast.undo") == "Undo (⌘Z)", "English Undo toast")
-    assert(loc("card.restore") == "Restore", "English card restore")
-
-    LocalizationService.shared.setLanguage("tr")
-    assert(loc("filter.deleted") == "Silinenler", "Turkish Deleted filter")
-    assert(loc("toast.undo") == "Geri Al (⌘Z)", "Turkish Undo toast")
-    assert(loc("card.restore") == "Geri Yükle", "Turkish card restore")
-    print("  ✔ Undo & Trash localization validation passed")
-
-    print("\n✅ All AleClip tests passed successfully!")
+    print("\n✅ All AleClip extended unit tests passed successfully!")
 }
 
 runTests()

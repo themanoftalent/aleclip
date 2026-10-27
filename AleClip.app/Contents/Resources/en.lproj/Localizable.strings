@@ -91,6 +91,10 @@
 "settings.general.audioFeedback" = "Audio Feedback";
 "settings.general.soundEffects" = "Play sound feedback when copying or pasting clips";
 
+"settings.general.startup" = "System Startup";
+"settings.general.launchAtLogin" = "Launch AleClip automatically when the computer starts";
+"settings.general.launchAtLoginHelp" = "Starts AleClip silently in the menu bar whenever you log into macOS.";
+
 "settings.alert.langRestartTitle" = "Language Changed";
 "settings.alert.langRestartMsg" = "Restart AleClip to apply the new language.";
 "settings.alert.restartNow" = "Restart Now";

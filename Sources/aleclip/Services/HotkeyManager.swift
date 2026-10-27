@@ -14,8 +14,8 @@ private func carbonHotKeyCallback(
 }
 
 public enum GlobalShortcutOption: String, CaseIterable, Identifiable, Codable, Sendable {
+    case cmdShiftV = "⇧⌘V (Shift + Command + V)"
     case optionV = "⌥V (Option + V)"
-    case cmdShiftV = "⌘⇧V (Command + Shift + V)"
     case controlOptionV = "⌃⌥V (Control + Option + V)"
     case optionSpace = "⌥Space (Option + Space)"
 
@@ -23,7 +23,7 @@ public enum GlobalShortcutOption: String, CaseIterable, Identifiable, Codable, S
 
     public var keyCode: UInt32 {
         switch self {
-        case .optionV, .cmdShiftV, .controlOptionV:
+        case .cmdShiftV, .optionV, .controlOptionV:
             return UInt32(kVK_ANSI_V)
         case .optionSpace:
             return UInt32(kVK_Space)
@@ -32,10 +32,10 @@ public enum GlobalShortcutOption: String, CaseIterable, Identifiable, Codable, S
 
     public var modifiers: UInt32 {
         switch self {
-        case .optionV:
-            return UInt32(optionKey)
         case .cmdShiftV:
             return UInt32(cmdKey | shiftKey)
+        case .optionV:
+            return UInt32(optionKey)
         case .controlOptionV:
             return UInt32(controlKey | optionKey)
         case .optionSpace:
@@ -56,7 +56,7 @@ public final class HotkeyManager: ObservableObject {
     private init() {}
 
     public func registerDefaultHotkey() {
-        registerHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey))
+        registerHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(cmdKey | shiftKey))
     }
 
     public func applyConfiguredHotkey() {
@@ -102,23 +102,17 @@ public final class HotkeyManager: ObservableObject {
 
         if registerStatus != noErr {
             print("Failed to register Carbon HotKey: \(registerStatus)")
-        } else {
-            print("AleClip: Global hotkey ⌥V successfully registered.")
         }
     }
 
     public func unregisterHotkey() {
-        if let hotKeyRef = hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
+        if let hotKey = hotKeyRef {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef = nil
         }
-        if let eventHandlerRef = eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-            self.eventHandlerRef = nil
+        if let handler = eventHandlerRef {
+            RemoveEventHandler(handler)
+            eventHandlerRef = nil
         }
-    }
-
-    deinit {
-        // In case of deallocation
     }
 }

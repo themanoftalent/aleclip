@@ -1,10 +1,22 @@
 import SwiftUI
 import AppKit
 
+final class QuickLookViewModel: ObservableObject {
+    @Published var showOCRTab: Bool = false
+}
+
 public struct QuickLookOverlay: View {
     public let clip: ClipItem
     public let onDismiss: () -> Void
     public let onPaste: () -> Void
+
+    @StateObject private var model = QuickLookViewModel()
+
+    public init(clip: ClipItem, onDismiss: @escaping () -> Void, onPaste: @escaping () -> Void) {
+        self.clip = clip
+        self.onDismiss = onDismiss
+        self.onPaste = onPaste
+    }
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +27,27 @@ public struct QuickLookOverlay: View {
                 Text(clip.displayTitle)
                     .font(.headline)
                     .lineLimit(1)
+
+                if let lang = clip.detectedLanguage {
+                    Text(lang)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.purple.opacity(0.18)))
+                        .foregroundColor(.purple)
+                }
+
+                if clip.isSensitive {
+                    HStack(spacing: 3) {
+                        Image(systemName: "exclamationmark.shield.fill")
+                        Text("Sensitive")
+                    }
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.red.opacity(0.18)))
+                    .foregroundColor(.red)
+                }
 
                 Spacer()
 
@@ -55,6 +88,8 @@ public struct QuickLookOverlay: View {
                     linkPreview
                 case .file:
                     filePreview
+                case .code:
+                    codePreview
                 case .text, .richText, .html:
                     textPreview
                 }
@@ -78,6 +113,11 @@ public struct QuickLookOverlay: View {
                 }
                 .keyboardShortcut("c", modifiers: .command)
 
+                Button("Paste Plain Text") {
+                    PasteService.shared.pasteClip(clip, targetApp: FloatingPanelController.shared.previousApp, forcePlainText: true)
+                    onDismiss()
+                }
+
                 Button(loc("quicklook.pasteIntoApp")) {
                     onPaste()
                 }
@@ -88,7 +128,7 @@ public struct QuickLookOverlay: View {
             .padding(.vertical, 10)
             .background(Color(nsColor: .windowBackgroundColor).opacity(0.85))
         }
-        .frame(width: 580, height: 380)
+        .frame(width: 600, height: 400)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -118,10 +158,48 @@ public struct QuickLookOverlay: View {
         }
     }
 
+    private var codePreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ScrollView {
+                Text(clip.plainText)
+                    .font(.system(size: 12, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            HStack {
+                Text("\(clip.plainText.components(separatedBy: .newlines).count) lines • \(clip.detectedLanguage ?? "Code")")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+        }
+    }
+
     private var imagePreview: some View {
-        Group {
-            if let filename = clip.imageFileName,
-               let nsImage = StorageService.shared.loadImageBlob(named: filename) {
+        VStack(spacing: 8) {
+            if let ocr = clip.ocrText, !ocr.isEmpty {
+                HStack {
+                    Picker("", selection: $model.showOCRTab) {
+                        Text("Image").tag(false)
+                        Text("Recognized Text (OCR)").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                    Spacer()
+                }
+            }
+
+            if model.showOCRTab, let ocr = clip.ocrText {
+                ScrollView {
+                    Text(ocr)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+            } else if let filename = clip.imageFileName,
+                      let nsImage = StorageService.shared.loadImageBlob(named: filename) {
                 VStack(spacing: 8) {
                     Image(nsImage: nsImage)
                         .resizable()

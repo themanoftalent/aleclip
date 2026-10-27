@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>A modern, lightweight native clipboard manager for macOS.</strong><br>
+  <strong>A modern, powerful native clipboard manager for macOS.</strong><br>
   Built natively with Swift 6, AppKit, and SwiftUI.
 </p>
 
@@ -13,6 +13,7 @@
   <a href="#features">Features</a> •
   <a href="#privacy--philosophy">Privacy & Philosophy</a> •
   <a href="#shortcuts">Keyboard Shortcuts</a> •
+  <a href="#mcp-integration">MCP & AI Integration</a> •
   <a href="#building-from-source">Build from Source</a> •
   <a href="#license">License</a>
 </p>
@@ -28,77 +29,99 @@
 
 ## 🛡️ Privacy & Philosophy
 
-- **Zero Data Collection**: AleClip contains **no telemetry, no analytics, no remote tracking, and no internet access**.
-- **100% Local Storage**: All clipboard clips and settings are encrypted/persisted strictly on your local disk (`~/Library/Application Support/AleClip/`).
-- **Free for Everyone**: Free to use, free to share, and free to fork for personal or organizational workflows.
+- **Zero Data Collection**: AleClip contains **no telemetry, no analytics, no remote tracking, and no external data selling**.
+- **100% Local & Encrypted Storage**: All clipboard clips, collections, and settings are saved locally (`~/Library/Application Support/AleClip/`).
+- **Screen-Sharing Privacy Shield**: Automatically conceals and blurs clipboard content during screen sharing, recordings, or presentations.
+- **Sensitive Data Protection**: Automatically detects, masks, and protects secret tokens, API keys (`sk-`, `ghp_`, `AKIA`), credit cards, and password manager transient pasteboards.
 - **Open Source (MIT)**: Permissive open-source license allows anyone to inspect, modify, fork, and build their own customized versions.
 
 ---
 
-## ✨ Features (v2.0.1 - 2026)
+## ✨ Features (v2.1.0 - 2026)
 
-- **Instant Undo (`⌘Z`) & Toast Banner**: Immediately recover accidentally deleted notes or clips with `⌘Z` or by clicking the notification banner.
-- **Recently Deleted (Trash Bin)**: Dedicated filter tab storing deleted notes with one-click restore (`↵` or button) and permanent purge options.
-- **Non-Activating Floating Panel**: Slides up smoothly from the bottom of your screen using `⌥V` (or your chosen shortcut) without stealing window focus from your active apps.
-- **Smart Multi-Monitor Detection**: Automatically identifies which screen your mouse cursor is on and positions the panel on that display.
-- **Click-Away Auto-Dismiss**: Seamlessly dismisses the panel if you click outside on desktop/other windows or switch apps.
-- **Direct Quick Paste (`⌘1`–`⌘9`)**: Instantly paste any of the first 9 cards directly into the active app with a single keystroke.
-- **RunLoop Common Mode Polling**: Polling timer runs on `.common` RunLoop mode to ensure copies during window dragging, scrolling, or menu tracking are never dropped.
-- **Large Clip Safety Protection**: Safely caps massive text dumps at 250,000 characters to prevent SwiftUI main-thread UI freezing.
-- **SSD Write Debouncing**: Groups rapid consecutive copies with a 0.4s debounce, preserving SSD write cycles and MacBook battery life.
-- **Automatic Corrupt File Recovery**: Safely archives any corrupt history files to `.bak` backups rather than discarding clipboard history.
-- **Native Audio Feedback**: Plays subtle macOS system audio (`Tink` on copy, `Pop` on paste) when sound effects are enabled.
-- **Subtle Background Watermark**: Clean, unobtrusive `"ALE"` watermark rendered on the panel background layer.
-- **Multi-Type Clipboard Support**:
-  - Plain Text & Rich Text (RTF)
-  - HTML & Markdown snippets
-  - High-resolution Images (PNG, TIFF, JPEG)
-  - URLs and Web Links (with one-click browser opening)
-  - File Paths & File URLs
-  - Hex / RGB Color Codes (with live swatch previews)
-- **Quick Look (`Space`)**: Press `Space` on any card for an instant enlarged preview of text, high-res images, links, or colors.
-- **Direct Paste (`↵`)**: Synthesizes `⌘V` directly into your frontmost application using native macOS Quartz Event Services.
-- **Plain Text Paste (`⇧↵`)**: Strips formatting and pastes pure unformatted text on the fly.
-- **Card-Based Settings Window (`⌘,`)**:
-  - **General**: Configurable history limits (50–1000 items), direct paste toggles, accessibility status checks, sound effects, and Language picker (System / English / Türkçe).
-  - **Shortcuts**: Configurable global hotkey (`⌥V`, `⌘⇧V`, `⌃⌥V`, `⌥Space`) and built-in shortcuts guide.
-  - **Exclusions**: Block sensitive apps (1Password, Bitwarden, Keychain, etc.) from being recorded, with an interactive macOS app picker.
-  - **Backup & Restore**: Export history to a standard `.json` file, restore with automatic deduplication, or prune unpinned items.
-  - **About**: Live clip counter, developer credits, and privacy highlights.
-- **Full Turkish & English Localization**: Seamless bilingual support across all panels, menus, settings, and shortcuts with dotted/dotless `I/ı/İ/i` search case-folding.
-- **Custom URL Scheme**: Control AleClip from scripts, terminal, or automations via `aleclip://toggle`, `aleclip://show`, `aleclip://settings`, and `aleclip://about`.
-- **Menu Bar Agent**: Lightweight status bar item showing recent clips, pin states, and quick access to Settings or History Purge.
+1. **Unlimited Clipboard History**: Automatically save all copied text, images, links, files, code snippets, and colors without losing previous entries.
+2. **Instant Search**: Instantly filter and search complete clipboard history across keywords, content, titles, and metadata (`⌘F`).
+3. **OCR Search**: Automatically recognizes and indexes text inside screenshots and images using Apple Vision, making image text instantly searchable.
+4. **Advanced Filtering**: Filter clipboard entries by application, date (Today, Yesterday, Past 7 Days, Past 30 Days), collections, and content categories.
+5. **Pinboards and Collections**: Permanent, customizable collections (`⇧⌘N`) to organize frequently used text, links, code snippets, and research materials.
+6. **Cloud Synchronization**: Synchronize clipboard history and collections securely across Mac, iPhone, iPad, and other devices via iCloud Drive or Cloud sync containers.
+7. **Intelligent Clipboard**: Context-aware engine that detects the frontmost application (IDEs, browsers, communications, documents) and prioritizes relevant clips.
+8. **AI and MCP Integration**: Native Model Context Protocol (MCP) server support for Claude Desktop, Cursor, VS Code, and Codex.
+9. **Sequential Copy and Paste**: Queue mode (FIFO / LIFO) allowing you to copy multiple items into a queue and paste them sequentially in order.
+10. **Plain-Text Pasting**: Paste text stripped of rich formatting or HTML using configurable shortcuts (`⇧↵` or settings).
+11. **Clipboard Editing**: Full editing sheet (`⌘E`), quick renaming (`⌘R`), duplication, previewing (`Space`), and deletion.
+12. **Quick Paste**: Global non-activating shortcut (`⇧⌘V` or `⌥V`) opens history instantly without switching apps, plus direct number paste (`⌘1`–`⌘9`).
+13. **Shared Collections**: Export and import shareable collection bundles (`.aleclipcollection`) for seamless collaboration.
+14. **Advanced Privacy Controls**: Exclude selected apps, automatically mask sensitive information, and pause clipboard monitoring (`⌘T`).
+15. **Screen-Sharing Privacy**: Automatically hides clipboard content during screen sharing, presentations, and screen recordings.
+16. **Multiple-Item Pasting**: Select multiple clips (`⌘`-click or `⇧`-click) and combine them into a single paste operation with customizable delimiters.
+17. **Source Application Tracking**: Captures and displays originating application icons, names, and bundle IDs for every copied item.
+18. **Visual Clipboard Interface**: Sleek cards with thumbnails, high-res previews, application icons, syntax badges, and relative timestamps.
+19. **Customizable Keyboard Shortcuts**: Complete set of configurable hotkeys for opening, searching, editing, collections, and monitoring.
+20. **Cross-Application Compatibility**: Reliable paste simulation across browsers, office suites, terminals, IDEs, Slack, and native macOS apps.
+21. **Background Operation**: Optimized event-driven loop with negligible CPU, battery, and memory overhead.
+22. **Reliable Local Storage**: Atomic JSON writes, corrupt file recovery (`.bak` backups), and automated snapshot mechanisms.
+23. **Advanced Content Recognition**: Auto-detection of URLs, emails, colors (HEX/RGB), file paths, and programming languages (Swift, Python, JS/TS, HTML, SQL, Shell, JSON).
+24. **Data Export and Backup**: Quick local backups, JSON import/export, and collection archive sharing.
+25. **Modern macOS Integration**: Native Sonoma/Sequoia SwiftUI and AppKit design, Apple silicon optimization, and dark mode support.
 
 ---
 
-## ⌨️ Shortcuts Reference
+## ⌨️ Keyboard Shortcuts
 
-| Shortcut | Action |
+| Action | Shortcut |
 | :--- | :--- |
-| `⌥V` | **Toggle Panel** (Open / Dismiss AleClip bottom panel) |
-| `←` `→` | **Navigate** between clipboard cards |
-| `↵` (Return) | **Paste** selected clip into active application |
-| `⌘1`–`⌘9` | **Quick Paste** card 1 to 9 directly into active application |
-| `⇧↵` (Shift+Return) | **Paste as Plain Text** (strips rich text / HTML styling) |
-| `Space` | **Quick Look Preview** (fullscreen card inspection) |
-| `⌘E` | **Edit Clip** (modify text content or assign custom title) |
-| `⌫` (Delete) | **Delete Clip** from history |
-| `⌘,` | **Open Settings** |
-| `Esc` | **Close** panel without pasting |
+| **Open clipboard history** | `Shift + Command + V` (`⇧⌘V`) or `⌥V` |
+| **Search clipboard** | `Command + F` (`⌘F`) |
+| **Edit selected item** | `Command + E` (`⌘E`) |
+| **Rename selected item** | `Command + R` (`⌘R`) |
+| **Create new collection** | `Shift + Command + N` (`⇧⌘N`) |
+| **Create new text item** | `Command + N` (`⌘N`) |
+| **Pause clipboard monitoring** | `Command + T` (`⌘T`) |
+| **Preview selected item** | `Space` |
+| **Direct Quick Paste** | `Command + 1` through `Command + 9` |
+| **Paste as Plain Text** | `Shift + Return` (`⇧↵`) |
+| **Undo last deletion** | `Command + Z` (`⌘Z`) |
+| **Dismiss panel** | `Escape` (`Esc`) |
 
-*(You can customize the global activation shortcut from Settings $\rightarrow$ Shortcuts).*
+---
+
+## 🤖 Model Context Protocol (MCP) Integration
+
+AleClip can run as a native MCP server over `stdio` to provide AI tools with real-time access to your clipboard and OCR index.
+
+To configure Claude Desktop or Cursor, add the following to your configuration:
+
+```json
+{
+  "mcpServers": {
+    "aleclip": {
+      "command": "/Applications/AleClip.app/Contents/MacOS/aleclip",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+### Supported MCP Tools:
+- `get_recent_clips(limit: Int)`: Retrieves the most recent clipboard entries.
+- `search_clipboard(query: String)`: Searches across history, metadata, and OCR image text.
+- `add_clip(text: String, title: String?)`: Appends a new item into your clipboard history.
+- `get_collections()`: Lists all organized pinboards and collections.
 
 ---
 
 ## 🛠️ Building from Source
 
-### Requirements
-- **macOS 14.0 (Sonoma)** or later
-- **Apple Command Line Tools** (`swiftlang-6.0` or newer) or Xcode
+### Prerequisites
+
+- macOS 14.0 or newer
+- Apple Command Line Tools (`swiftlang-6.0` or newer) or Xcode
 
 ### Build & Run Tests
+
 ```bash
-# Clone or navigate to the repository
+# Navigate to repository
 cd aleclip
 
 # Build debug binary
@@ -109,7 +132,6 @@ swift run test-runner
 ```
 
 ### Packaging `.app` and `.dmg`
-The repository includes an automated release packaging script that compiles in release mode, generates Apple `.icns` icons, signs the bundle with ad-hoc signatures, strips quarantine attributes, and builds a distribution DMG:
 
 ```bash
 ./scripts/package_app.sh
@@ -117,28 +139,11 @@ The repository includes an automated release packaging script that compiles in r
 
 The output files will be created at:
 - `AleClip.app` (Installed to `/Applications/AleClip.app`)
-- `AleClip.dmg` (Distribution disk image with drag-and-drop `/Applications` link)
-
----
-
-## 🪟 Windows Version
-
-Looking for the native Windows edition (`AleClip.exe`)?  
-Visit the dedicated repository: [**themanoftalent/aleclip-windows**](https://github.com/themanoftalent/aleclip-windows)
-
----
-
----
-
-## ☕ Sponsor or Buy Me a Coffee
-
-If you find this project helpful, consider supporting it or reaching out for collaboration:
-
-[![Buy Me A Coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-SUPPORT%20PROJECT-green?style=for-the-badge&logo=buymeacoffee)](https://buymeacoffee.com/themanoftalent) [![GitHub Sponsors](https://img.shields.io/badge/SPONSOR-GITHUB%20SPONSORS-ea4aaa?style=for-the-badge&logo=githubsponsors)](https://github.com/sponsors/themanoftalent) [![Let's Connect](https://img.shields.io/badge/LET%27S%20CONNECT-EMAIL-blue?style=for-the-badge&logo=gmail)](mailto:cs.akifcifci@gmail.com)
+- `AleClip.dmg` (Distribution disk image)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.  
-Created and maintained by **SoftAI Yazılım (Mehmet Akif Çifçi)**.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.  
+Created and maintained by SoftAI Yazılım (Mehmet Akif Çifçi).

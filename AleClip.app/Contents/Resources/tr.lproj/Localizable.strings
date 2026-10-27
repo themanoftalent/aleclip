@@ -91,6 +91,10 @@
 "settings.general.audioFeedback" = "Sesli Geri Bildirim";
 "settings.general.soundEffects" = "Kayıt kopyalandığında veya yapıştırıldığında ses çal";
 
+"settings.general.startup" = "Sistem Başlangıcı";
+"settings.general.launchAtLogin" = "Bilgisayar açıldığında AleClip'i otomatik başlat";
+"settings.general.launchAtLoginHelp" = "macOS'a giriş yaptığınızda AleClip menü çubuğunda sessizce hazır başlar.";
+
 "settings.alert.langRestartTitle" = "Dil Değiştirildi";
 "settings.alert.langRestartMsg" = "Yeni dilin uygulanması için AleClip'i yeniden başlatın.";
 "settings.alert.restartNow" = "Şimdi Yeniden Başlat";

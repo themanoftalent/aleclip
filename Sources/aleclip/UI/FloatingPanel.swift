@@ -28,6 +28,16 @@ public class FloatingPanel: NSPanel {
     }
 }
 
+public enum DateFilterOption: String, CaseIterable, Identifiable {
+    case allTime = "All Time"
+    case today = "Today"
+    case yesterday = "Yesterday"
+    case pastWeek = "Past 7 Days"
+    case pastMonth = "Past 30 Days"
+
+    public var id: String { rawValue }
+}
+
 @MainActor
 public final class FloatingPanelController: ObservableObject {
     public static let shared = FloatingPanelController()
@@ -36,12 +46,25 @@ public final class FloatingPanelController: ObservableObject {
     @Published public var selectedIndex: Int = 0
     @Published public var searchText: String = ""
     @Published public var selectedFilter: FilterTab = .all
+    @Published public var selectedCollectionId: UUID? = nil
+    @Published public var selectedAppFilter: String? = nil
+    @Published public var selectedDateFilter: DateFilterOption = .allTime
+
     @Published public var previewClip: ClipItem? = nil
     @Published public var editingClip: ClipItem? = nil
+    @Published public var renamingClip: ClipItem? = nil
+    @Published public var showNewCollectionSheet: Bool = false
+    @Published public var showNewClipSheet: Bool = false
+
+    @Published public var multiSelectedIds: Set<UUID> = []
+    @Published public var isMultiSelectMode: Bool = false
+
     @Published public var showShortcutsPopover: Bool = false
     @Published public var toastMessage: String? = nil
     @Published public var toastActionTitle: String? = nil
     @Published public var toastAction: (() -> Void)? = nil
+
+    public var focusSearchTrigger: (() -> Void)?
 
     public private(set) var previousApp: NSRunningApplication?
     private var panel: FloatingPanel?
@@ -54,6 +77,7 @@ public final class FloatingPanelController: ObservableObject {
         case all = "All"
         case pinned = "Pinned"
         case text = "Text"
+        case code = "Code"
         case links = "Links"
         case images = "Images"
         case files = "Files"
@@ -67,6 +91,7 @@ public final class FloatingPanelController: ObservableObject {
             case .all: return loc("filter.all")
             case .pinned: return loc("filter.pinned")
             case .text: return loc("filter.text")
+            case .code: return "Code"
             case .links: return loc("filter.links")
             case .images: return loc("filter.images")
             case .files: return loc("filter.files")
@@ -80,6 +105,7 @@ public final class FloatingPanelController: ObservableObject {
             case .all: return "square.stack.3d.up"
             case .pinned: return "pin.fill"
             case .text: return "doc.text"
+            case .code: return "curlybraces"
             case .links: return "link"
             case .images: return "photo"
             case .files: return "folder"
@@ -92,7 +118,7 @@ public final class FloatingPanelController: ObservableObject {
     private init() {}
 
     public func setup() {
-        let panelRect = NSRect(x: 0, y: 0, width: 880, height: 260)
+        let panelRect = NSRect(x: 0, y: 0, width: 920, height: 280)
         let panel = FloatingPanel(contentRect: panelRect)
 
         let hostingView = NSHostingView(rootView: ClipboardBarView())
@@ -116,42 +142,44 @@ public final class FloatingPanelController: ObservableObject {
 
         guard let panel = panel else { return }
 
-        // Remember the currently frontmost app before showing panel
         let frontmost = NSWorkspace.shared.frontmostApplication
         if frontmost?.bundleIdentifier != Bundle.main.bundleIdentifier {
             self.previousApp = frontmost
         }
 
-        // Reset state
         self.searchText = ""
         self.selectedIndex = 0
         self.previewClip = nil
         self.editingClip = nil
+        self.renamingClip = nil
+        self.showNewCollectionSheet = false
+        self.showNewClipSheet = false
+        self.multiSelectedIds.removeAll()
+        self.isMultiSelectMode = false
         self.showShortcutsPopover = false
         self.toastMessage = nil
         self.toastActionTitle = nil
         self.toastAction = nil
 
-        // Position at bottom center of screen where mouse currently is
         let mouseLocation = NSEvent.mouseLocation
         let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen = targetScreen {
             let screenRect = screen.visibleFrame
             let x = screenRect.midX - (panel.frame.width / 2.0)
-            let y = screenRect.minY + 24 // 24px above dock / bottom edge
+            let y = screenRect.minY + 24
             panel.setFrameOrigin(NSPoint(x: x, y: y))
         }
 
         panel.alphaValue = 0.0
-        panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-
+        panel.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
+            context.duration = 0.16
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1.0
         }
 
-        isVisible = true
+        self.isVisible = true
+
         startKeyboardMonitoring()
         startDismissMonitoring()
     }
@@ -164,41 +192,48 @@ public final class FloatingPanelController: ObservableObject {
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0.0
         }, completionHandler: { [weak self] in
-            DispatchQueue.main.async {
-                panel.orderOut(nil)
-                self?.isVisible = false
-                self?.showShortcutsPopover = false
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.panel?.orderOut(nil)
+                self.isVisible = false
+                self.previewClip = nil
+                self.editingClip = nil
+                self.renamingClip = nil
+                self.showNewCollectionSheet = false
+                self.showNewClipSheet = false
             }
         })
     }
 
-    // MARK: - Dismiss Monitoring (Outside clicks & app switching)
-
     private func startDismissMonitoring() {
         stopDismissMonitoring()
 
-        // 1. Outside click monitor (clicks on other apps or desktop)
-        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             Task { @MainActor [weak self] in
-                guard let self = self, self.isVisible else { return }
-                self.hide()
+                guard let self = self, self.isVisible, let panel = self.panel else { return }
+                let clickLocation = NSEvent.mouseLocation
+                if !NSMouseInRect(clickLocation, panel.frame, false) {
+                    if self.previewClip == nil && self.editingClip == nil && self.renamingClip == nil &&
+                        !self.showNewCollectionSheet && !self.showNewClipSheet {
+                        self.hide()
+                    }
+                }
             }
         }
 
-        // 2. Resign key notification (app switching via Command-Tab, clicking menubar, etc.)
-        if let panel = self.panel {
-            resignObserver = NotificationCenter.default.addObserver(
-                forName: NSWindow.didResignKeyNotification,
-                object: panel,
-                queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    guard let self = self, self.isVisible else { return }
-                    if !self.showShortcutsPopover && self.previewClip == nil && self.editingClip == nil {
-                        self.hide()
-                    }
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isVisible else { return }
+                if self.previewClip == nil && self.editingClip == nil && self.renamingClip == nil &&
+                    !self.showNewCollectionSheet && !self.showNewClipSheet {
+                    self.hide()
                 }
             }
         }
@@ -223,7 +258,7 @@ public final class FloatingPanelController: ObservableObject {
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self, self.isVisible else { return event }
 
-            // If an edit sheet or quick look is open, let it handle keys unless Escape is pressed
+            // If a modal sheet is open, let Escape dismiss it
             if self.previewClip != nil {
                 if event.keyCode == 53 /* Escape */ || event.keyCode == 49 /* Space */ {
                     self.previewClip = nil
@@ -240,15 +275,79 @@ public final class FloatingPanelController: ObservableObject {
                 return event
             }
 
-            // ⌘Z Undo last deletion
-            if event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.shift) && event.keyCode == 6 /* 'Z' */ {
+            if self.renamingClip != nil {
+                if event.keyCode == 53 /* Escape */ {
+                    self.renamingClip = nil
+                    return nil
+                }
+                return event
+            }
+
+            if self.showNewCollectionSheet {
+                if event.keyCode == 53 /* Escape */ {
+                    self.showNewCollectionSheet = false
+                    return nil
+                }
+                return event
+            }
+
+            if self.showNewClipSheet {
+                if event.keyCode == 53 /* Escape */ {
+                    self.showNewClipSheet = false
+                    return nil
+                }
+                return event
+            }
+
+            let flags = event.modifierFlags
+
+            // ⇧⌘N : Create new collection
+            if flags.contains(.command) && flags.contains(.shift) && event.keyCode == 45 /* 'N' */ {
+                self.showNewCollectionSheet = true
+                return nil
+            }
+
+            // ⌘N : Create new text item
+            if flags.contains(.command) && !flags.contains(.shift) && event.keyCode == 45 /* 'N' */ {
+                self.showNewClipSheet = true
+                return nil
+            }
+
+            // ⌘F : Search clipboard
+            if flags.contains(.command) && event.keyCode == 3 /* 'F' */ {
+                self.focusSearchTrigger?()
+                return nil
+            }
+
+            // ⌘E : Edit selected item
+            if flags.contains(.command) && event.keyCode == 14 /* 'E' */ {
+                self.editSelected()
+                return nil
+            }
+
+            // ⌘R : Rename selected item
+            if flags.contains(.command) && event.keyCode == 15 /* 'R' */ {
+                self.renameSelected()
+                return nil
+            }
+
+            // ⌘T : Pause clipboard monitoring
+            if flags.contains(.command) && event.keyCode == 17 /* 'T' */ {
+                ClipboardMonitor.shared.togglePause()
+                let status = ClipboardMonitor.shared.isPaused ? "Monitoring Paused (⌘T)" : "Monitoring Resumed (⌘T)"
+                self.showToast(message: status)
+                return nil
+            }
+
+            // ⌘Z : Undo last deletion
+            if flags.contains(.command) && !flags.contains(.shift) && event.keyCode == 6 /* 'Z' */ {
                 if self.undoLastDelete() {
                     return nil
                 }
             }
 
             // ⌘1 through ⌘9 Quick Paste
-            if event.modifierFlags.contains(.command),
+            if flags.contains(.command),
                let chars = event.charactersIgnoringModifiers,
                let firstChar = chars.first,
                let num = Int(String(firstChar)),
@@ -260,7 +359,7 @@ public final class FloatingPanelController: ObservableObject {
                     if self.selectedFilter == .deleted {
                         self.restoreClip(items[index])
                     } else {
-                        self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
+                        self.pasteSelected(forcePlainText: flags.contains(.shift))
                     }
                     return nil
                 }
@@ -286,8 +385,11 @@ public final class FloatingPanelController: ObservableObject {
                         self.restoreClip(items[self.selectedIndex])
                         return nil
                     }
+                } else if !self.multiSelectedIds.isEmpty {
+                    self.pasteMultiSelected(forcePlainText: flags.contains(.shift))
+                    return nil
                 } else {
-                    self.pasteSelected(forcePlainText: event.modifierFlags.contains(.shift))
+                    self.pasteSelected(forcePlainText: flags.contains(.shift))
                     return nil
                 }
 
@@ -303,14 +405,8 @@ public final class FloatingPanelController: ObservableObject {
                     return nil
                 }
 
-            case 14: // 'E'
-                if event.modifierFlags.contains(.command) {
-                    self.editSelected()
-                    return nil
-                }
-
             case 43: // ','
-                if event.modifierFlags.contains(.command) {
+                if flags.contains(.command) {
                     self.hide()
                     MenuBarController.shared.openSettingsAction()
                     return nil
@@ -366,31 +462,66 @@ public final class FloatingPanelController: ObservableObject {
             return deleted.filter { $0.matches(query: searchText) }
         }
 
-        let allClips = StorageService.shared.clips
-        return allClips.filter { clip in
-            // Filter by Tab
-            switch selectedFilter {
-            case .all:
-                break
-            case .pinned:
-                if !clip.isPinned { return false }
-            case .text:
-                if clip.type != .text && clip.type != .richText && clip.type != .html { return false }
-            case .links:
-                if clip.type != .link { return false }
-            case .images:
-                if clip.type != .image { return false }
-            case .files:
-                if clip.type != .file { return false }
-            case .colors:
-                if clip.type != .color { return false }
-            case .deleted:
-                return false
-            }
+        var list = StorageService.shared.clips
 
-            // Filter by search query
-            return clip.matches(query: searchText)
+        // Filter by Tab
+        switch selectedFilter {
+        case .all:
+            break
+        case .pinned:
+            list = list.filter { $0.isPinned }
+        case .text:
+            list = list.filter { $0.type == .text || $0.type == .richText || $0.type == .html }
+        case .code:
+            list = list.filter { $0.type == .code || $0.detectedLanguage != nil }
+        case .links:
+            list = list.filter { $0.type == .link }
+        case .images:
+            list = list.filter { $0.type == .image }
+        case .files:
+            list = list.filter { $0.type == .file }
+        case .colors:
+            list = list.filter { $0.type == .color }
+        case .deleted:
+            break
         }
+
+        // Filter by Collection
+        if let colId = selectedCollectionId {
+            list = list.filter { $0.collectionId == colId }
+        }
+
+        // Filter by App
+        if let app = selectedAppFilter, !app.isEmpty {
+            list = list.filter { $0.sourceAppName == app }
+        }
+
+        // Filter by Date
+        let calendar = Calendar.current
+        let now = Date()
+        switch selectedDateFilter {
+        case .allTime:
+            break
+        case .today:
+            list = list.filter { calendar.isDateInToday($0.createdAt) }
+        case .yesterday:
+            list = list.filter { calendar.isDateInYesterday($0.createdAt) }
+        case .pastWeek:
+            if let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: now) {
+                list = list.filter { $0.createdAt >= oneWeekAgo }
+            }
+        case .pastMonth:
+            if let oneMonthAgo = calendar.date(byAdding: .day, value: -30, to: now) {
+                list = list.filter { $0.createdAt >= oneMonthAgo }
+            }
+        }
+
+        // Search query
+        if !searchText.isEmpty {
+            list = list.filter { $0.matches(query: searchText) }
+        }
+
+        return list
     }
 
     public func moveSelection(by delta: Int) {
@@ -412,6 +543,15 @@ public final class FloatingPanelController: ObservableObject {
         let target = self.previousApp
         hide()
         PasteService.shared.pasteClip(selectedClip, targetApp: target, forcePlainText: forcePlainText)
+    }
+
+    public func pasteMultiSelected(forcePlainText: Bool = false) {
+        let items = filteredClips()
+        let selected = items.filter { multiSelectedIds.contains($0.id) }
+        guard !selected.isEmpty else { return }
+        let target = self.previousApp
+        hide()
+        PasteService.shared.pasteMultipleClips(selected, targetApp: target, delimiter: "\n", forcePlainText: forcePlainText)
     }
 
     public func toggleQuickLook() {
@@ -484,5 +624,11 @@ public final class FloatingPanelController: ObservableObject {
         let items = filteredClips()
         guard selectedIndex >= 0 && selectedIndex < items.count else { return }
         editingClip = items[selectedIndex]
+    }
+
+    public func renameSelected() {
+        let items = filteredClips()
+        guard selectedIndex >= 0 && selectedIndex < items.count else { return }
+        renamingClip = items[selectedIndex]
     }
 }

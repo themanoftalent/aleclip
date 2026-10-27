@@ -73,7 +73,7 @@ public final class PasteService {
             }
             pasteboard.setString(clip.plainText, forType: .string)
 
-        case .text:
+        case .text, .code:
             pasteboard.setString(clip.plainText, forType: .string)
         }
     }
@@ -98,38 +98,55 @@ public final class PasteService {
         }
     }
 
-    public func simulatePasteKeystroke() {
+    public func pasteMultipleClips(_ clips: [ClipItem], targetApp: NSRunningApplication?, delimiter: String = "\n", forcePlainText: Bool = false) {
+        guard !clips.isEmpty else { return }
+
+        let combinedText = clips.map { $0.plainText }.joined(separator: delimiter)
+        let combinedClip = ClipItem(
+            type: .text,
+            plainText: combinedText,
+            contentHash: UUID().uuidString
+        )
+
+        pasteClip(combinedClip, targetApp: targetApp, forcePlainText: forcePlainText)
+    }
+
+    public func pasteNextInQueue(targetApp: NSRunningApplication?) -> Bool {
+        guard let next = SequentialPasteService.shared.popNext() else {
+            return false
+        }
+        pasteClip(next, targetApp: targetApp)
+        return true
+    }
+
+    private func simulatePasteKeystroke() {
         guard isAccessibilityTrusted else {
-            print("AleClip: Accessibility permission not granted. Clip copied to clipboard for manual ⌘V.")
+            promptAccessibilityIfNeeded()
             return
         }
 
         let source = CGEventSource(stateID: .combinedSessionState)
-        // Keycode 9 is the standard ANSI 'V' key
-        let vKeyCode: CGKeyCode = 9
+        let vKeyCode: CGKeyCode = 9 // ANSI 'V'
 
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {
-            return
-        }
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
+        keyDown?.flags = .maskCommand
 
-        keyDown.flags = .maskCommand
-        keyUp.flags = .maskCommand
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
+        keyUp?.flags = .maskCommand
 
-        keyDown.post(tap: .cghidEventTap)
-        keyUp.post(tap: .cghidEventTap)
+        keyDown?.post(tap: .cghidEventTap)
+        keyUp?.post(tap: .cghidEventTap)
     }
 
     private func colorFromHex(_ hex: String) -> NSColor? {
-        var cleanHex = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if cleanHex.hasPrefix("#") {
-            cleanHex.removeFirst()
-        }
-        guard cleanHex.count == 6, let rgbValue = UInt32(cleanHex, radix: 16) else { return nil }
+        var cleanHex = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanHex.hasPrefix("#") { cleanHex.removeFirst() }
 
-        let r = CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0
-        let g = CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0
-        let b = CGFloat(rgbValue & 0x0000FF) / 255.0
+        guard cleanHex.count == 6, let rgb = UInt32(cleanHex, radix: 16) else { return nil }
+        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
+        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
+        let b = CGFloat(rgb & 0xFF) / 255.0
+
         return NSColor(srgbRed: r, green: g, blue: b, alpha: 1.0)
     }
 }
