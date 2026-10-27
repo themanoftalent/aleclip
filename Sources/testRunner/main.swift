@@ -148,6 +148,14 @@ func runTests() {
     }
     print("  ✔ Reliable local storage backup creation passed")
 
+    // 13. Google Drive Auto-Detection & Sync
+    let cloudSync = CloudSyncService.shared
+    assert(cloudSync.selectedProvider == .googleDrive, "Google Drive should be default sync provider")
+    cloudSync.syncNow()
+    assert(cloudSync.lastSyncTime != nil, "lastSyncTime should be recorded after sync")
+    assert(cloudSync.syncStatusMessage.contains("✅"), "Sync status should indicate success")
+    print("  ✔ Google Drive cloud synchronization passed")
+
     print("\n✅ All AleClip extended unit tests passed successfully!")
 }
 
