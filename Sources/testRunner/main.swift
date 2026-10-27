@@ -77,12 +77,13 @@ func runTests() {
     print("  ✔ Unlimited clipboard history protection passed")
 
     // 6. Pinboards & Collections (Feature 5)
-    let testCollection = ClipCollection(name: "Dev Snippets", icon: "curlybraces", colorHex: "#BF5AF2")
+    let testCollection = ClipCollection(name: "Test Pinboard", icon: "curlybraces", colorHex: "#BF5AF2")
     storage.addCollection(testCollection)
     assert(storage.collections.contains { $0.id == testCollection.id }, "Collection must be stored")
 
     storage.assignClip(clipId: c1.id, to: testCollection.id)
     assert(storage.clips.first(where: { $0.id == c1.id })?.collectionId == testCollection.id, "Clip must be assigned to collection")
+    storage.removeCollection(id: testCollection.id) // Clean up test collection
     print("  ✔ Pinboards and collections management passed")
 
     // 7. Sequential Copy and Paste Queue (Feature 9)

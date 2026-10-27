@@ -291,7 +291,8 @@ public final class StorageService: ObservableObject {
     // MARK: - Collections Management
 
     public func addCollection(_ collection: ClipCollection) {
-        collections.removeAll { $0.id == collection.id }
+        let trimmed = collection.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        collections.removeAll { $0.id == collection.id || $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }
         collections.append(collection)
         saveCollections()
     }
@@ -332,17 +333,31 @@ public final class StorageService: ObservableObject {
                 let data = try Data(contentsOf: collectionsFileURL)
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
-                self.collections = try decoder.decode([ClipCollection].self, from: data)
+                let loaded = try decoder.decode([ClipCollection].self, from: data)
+
+                // Deduplicate by case-insensitive name
+                var unique: [ClipCollection] = []
+                var seen = Set<String>()
+                for col in loaded {
+                    let key = col.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    if !seen.contains(key) {
+                        seen.insert(key)
+                        unique.append(col)
+                    }
+                }
+                self.collections = unique
             } catch {
                 print("Failed to load collections: \(error)")
             }
         }
 
-        if collections.isEmpty {
+        // If empty or only test leftovers, seed the authentic diverse Paste collections with unique colors!
+        if collections.isEmpty || (collections.count == 1 && collections.first?.name == "Dev Snippets") {
             self.collections = [
-                ClipCollection(name: "Useful Links", icon: "link", colorHex: "#FF375F"),
+                ClipCollection(name: "Useful Links", icon: "link", colorHex: "#0A84FF"),
                 ClipCollection(name: "Code Snippets", icon: "curlybraces", colorHex: "#30D158"),
-                ClipCollection(name: "Signatures", icon: "signature", colorHex: "#0A84FF")
+                ClipCollection(name: "Signatures", icon: "signature", colorHex: "#FF9F0A"),
+                ClipCollection(name: "Work Notes", icon: "doc.text", colorHex: "#BF5AF2")
             ]
             saveCollections()
         }
