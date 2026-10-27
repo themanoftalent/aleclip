@@ -26,6 +26,10 @@ public class FloatingPanel: NSPanel {
     public override var canBecomeMain: Bool {
         return true
     }
+
+    public override func cancelOperation(_ sender: Any?) {
+        FloatingPanelController.shared.hide()
+    }
 }
 
 public enum DateFilterOption: String, CaseIterable, Identifiable {
@@ -69,6 +73,7 @@ public final class FloatingPanelController: ObservableObject {
     public private(set) var previousApp: NSRunningApplication?
     private var panel: FloatingPanel?
     private var localKeyMonitor: Any?
+    private var globalKeyMonitor: Any?
     private var globalClickMonitor: Any?
     private var resignObserver: NSObjectProtocol?
     private var toastDismissWorkItem: DispatchWorkItem?
@@ -173,7 +178,8 @@ public final class FloatingPanelController: ObservableObject {
         }
 
         panel.alphaValue = 0.0
-        panel.orderFrontRegardless()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.16
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -257,45 +263,49 @@ public final class FloatingPanelController: ObservableObject {
     private func startKeyboardMonitoring() {
         stopKeyboardMonitoring()
 
+        // 1. Global Escape key monitor guarantees Escape closes panel even if focus shifted
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self, self.isVisible else { return }
+            if event.keyCode == 53 /* Escape */ {
+                Task { @MainActor [weak self] in
+                    self?.hide()
+                }
+            }
+        }
+
+        // 2. Local monitor for all active panel keys
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self, self.isVisible else { return event }
 
-            // If a modal sheet is open, let Escape dismiss it
-            if self.previewClip != nil {
-                if event.keyCode == 53 /* Escape */ || event.keyCode == 49 /* Space */ {
+            // Priority: Escape ALWAYS dismisses sub-sheets first, or closes the panel immediately
+            if event.keyCode == 53 /* Escape */ {
+                if self.previewClip != nil {
                     self.previewClip = nil
                     return nil
                 }
-                return event
-            }
-
-            if self.editingClip != nil {
-                if event.keyCode == 53 /* Escape */ {
+                if self.editingClip != nil {
                     self.editingClip = nil
                     return nil
                 }
-                return event
-            }
-
-            if self.renamingClip != nil {
-                if event.keyCode == 53 /* Escape */ {
+                if self.renamingClip != nil {
                     self.renamingClip = nil
                     return nil
                 }
-                return event
-            }
-
-            if self.showNewCollectionSheet {
-                if event.keyCode == 53 /* Escape */ {
+                if self.showNewCollectionSheet {
                     self.showNewCollectionSheet = false
                     return nil
                 }
-                return event
+                if self.showNewClipSheet {
+                    self.showNewClipSheet = false
+                    return nil
+                }
+                self.hide()
+                return nil
             }
 
-            if self.showNewClipSheet {
-                if event.keyCode == 53 /* Escape */ {
-                    self.showNewClipSheet = false
+            if self.previewClip != nil {
+                if event.keyCode == 49 /* Space */ {
+                    self.previewClip = nil
                     return nil
                 }
                 return event
@@ -426,6 +436,10 @@ public final class FloatingPanelController: ObservableObject {
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
             localKeyMonitor = nil
+        }
+        if let gMonitor = globalKeyMonitor {
+            NSEvent.removeMonitor(gMonitor)
+            globalKeyMonitor = nil
         }
     }
 

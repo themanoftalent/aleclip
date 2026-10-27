@@ -14,8 +14,8 @@ private func carbonHotKeyCallback(
 }
 
 public enum GlobalShortcutOption: String, CaseIterable, Identifiable, Codable, Sendable {
-    case cmdShiftV = "⇧⌘V (Shift + Command + V)"
     case optionV = "⌥V (Option + V)"
+    case cmdShiftV = "⇧⌘V (Shift + Command + V)"
     case controlOptionV = "⌃⌥V (Control + Option + V)"
     case optionSpace = "⌥Space (Option + Space)"
 
@@ -50,25 +50,12 @@ public final class HotkeyManager: ObservableObject {
 
     public var onHotkeyPressed: (() -> Void)?
 
-    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyRefs: [EventHotKeyRef] = []
     private var eventHandlerRef: EventHandlerRef?
 
     private init() {}
 
-    public func registerDefaultHotkey() {
-        registerHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(cmdKey | shiftKey))
-    }
-
     public func applyConfiguredHotkey() {
-        let saved = StorageService.shared.settings.selectedShortcut
-        if let option = GlobalShortcutOption(rawValue: saved) {
-            registerHotkey(keyCode: option.keyCode, modifiers: option.modifiers)
-        } else {
-            registerDefaultHotkey()
-        }
-    }
-
-    public func registerHotkey(keyCode: UInt32, modifiers: UInt32) {
         unregisterHotkey()
 
         var eventType = EventTypeSpec(
@@ -90,26 +77,54 @@ public final class HotkeyManager: ObservableObject {
             return
         }
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x434C4950), id: 1) // 'CLIP'
+        // Register ⌥V (Option + V) as requested by user
+        registerSingleHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey), id: 1)
+
+        // Register ⇧⌘V (Shift + Command + V) as dual convenience
+        registerSingleHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(cmdKey | shiftKey), id: 2)
+
+        // Also register any custom option selected in Settings if different
+        let saved = StorageService.shared.settings.selectedShortcut
+        if let option = GlobalShortcutOption(rawValue: saved) {
+            if option != .optionV && option != .cmdShiftV {
+                registerSingleHotkey(keyCode: option.keyCode, modifiers: option.modifiers, id: 3)
+            }
+        }
+    }
+
+    public func registerDefaultHotkey() {
+        applyConfiguredHotkey()
+    }
+
+    public func registerHotkey(keyCode: UInt32, modifiers: UInt32) {
+        applyConfiguredHotkey()
+    }
+
+    private func registerSingleHotkey(keyCode: UInt32, modifiers: UInt32, id: UInt32) {
+        let hotKeyID = EventHotKeyID(signature: OSType(0x434C4950), id: id) // 'CLIP'
+        var ref: EventHotKeyRef?
         let registerStatus = RegisterEventHotKey(
             keyCode,
             modifiers,
             hotKeyID,
             GetApplicationEventTarget(),
             0,
-            &hotKeyRef
+            &ref
         )
 
-        if registerStatus != noErr {
-            print("Failed to register Carbon HotKey: \(registerStatus)")
+        if registerStatus == noErr, let validRef = ref {
+            hotKeyRefs.append(validRef)
+        } else {
+            print("Failed to register Carbon HotKey ID \(id): \(registerStatus)")
         }
     }
 
     public func unregisterHotkey() {
-        if let hotKey = hotKeyRef {
-            UnregisterEventHotKey(hotKey)
-            hotKeyRef = nil
+        for ref in hotKeyRefs {
+            UnregisterEventHotKey(ref)
         }
+        hotKeyRefs.removeAll()
+
         if let handler = eventHandlerRef {
             RemoveEventHandler(handler)
             eventHandlerRef = nil

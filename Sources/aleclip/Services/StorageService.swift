@@ -8,7 +8,7 @@ public struct AppSettings: Codable, Sendable {
     public var plainTextAlways: Bool = false
     public var soundEffects: Bool = true
     public var launchAtLogin: Bool = true
-    public var selectedShortcut: String = "⇧⌘V (Shift + Command + V)"
+    public var selectedShortcut: String = "⌥V (Option + V)"
     public var screenShieldPrivacy: Bool = false
     public var maskSensitiveData: Bool = true
     public var excludedBundleIds: [String] = [
@@ -28,7 +28,7 @@ public struct AppSettings: Codable, Sendable {
         self.plainTextAlways = try container.decodeIfPresent(Bool.self, forKey: .plainTextAlways) ?? false
         self.soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
         self.launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? true
-        self.selectedShortcut = try container.decodeIfPresent(String.self, forKey: .selectedShortcut) ?? "⇧⌘V (Shift + Command + V)"
+        self.selectedShortcut = try container.decodeIfPresent(String.self, forKey: .selectedShortcut) ?? "⌥V (Option + V)"
         self.screenShieldPrivacy = try container.decodeIfPresent(Bool.self, forKey: .screenShieldPrivacy) ?? false
         self.maskSensitiveData = try container.decodeIfPresent(Bool.self, forKey: .maskSensitiveData) ?? true
         self.excludedBundleIds = try container.decodeIfPresent([String].self, forKey: .excludedBundleIds) ?? [
