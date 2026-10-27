@@ -311,14 +311,24 @@ public final class StorageService: ObservableObject {
     }
 
     private func loadCollections() {
-        guard fileManager.fileExists(atPath: collectionsFileURL.path) else { return }
-        do {
-            let data = try Data(contentsOf: collectionsFileURL)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            self.collections = try decoder.decode([ClipCollection].self, from: data)
-        } catch {
-            print("Failed to load collections: \(error)")
+        if fileManager.fileExists(atPath: collectionsFileURL.path) {
+            do {
+                let data = try Data(contentsOf: collectionsFileURL)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                self.collections = try decoder.decode([ClipCollection].self, from: data)
+            } catch {
+                print("Failed to load collections: \(error)")
+            }
+        }
+
+        if collections.isEmpty {
+            self.collections = [
+                ClipCollection(name: "Useful Links", icon: "link", colorHex: "#FF375F"),
+                ClipCollection(name: "Code Snippets", icon: "curlybraces", colorHex: "#30D158"),
+                ClipCollection(name: "Signatures", icon: "signature", colorHex: "#0A84FF")
+            ]
+            saveCollections()
         }
     }
 

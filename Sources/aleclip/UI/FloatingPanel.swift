@@ -118,7 +118,10 @@ public final class FloatingPanelController: ObservableObject {
     private init() {}
 
     public func setup() {
-        let panelRect = NSRect(x: 0, y: 0, width: 980, height: 290)
+        let screen = NSScreen.main
+        let screenRect = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let panelHeight: CGFloat = 330
+        let panelRect = NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width, height: panelHeight)
         let panel = FloatingPanel(contentRect: panelRect)
 
         let hostingView = NSHostingView(rootView: ClipboardBarView())
@@ -165,9 +168,8 @@ public final class FloatingPanelController: ObservableObject {
         let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
         if let screen = targetScreen {
             let screenRect = screen.visibleFrame
-            let x = screenRect.midX - (panel.frame.width / 2.0)
-            let y = screenRect.minY + 24
-            panel.setFrameOrigin(NSPoint(x: x, y: y))
+            let panelHeight: CGFloat = 330
+            panel.setFrame(NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width, height: panelHeight), display: true)
         }
 
         panel.alphaValue = 0.0

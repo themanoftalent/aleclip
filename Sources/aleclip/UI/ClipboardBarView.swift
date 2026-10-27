@@ -26,20 +26,22 @@ public struct ClipboardBarView: View {
     public var body: some View {
         let items = controller.filteredClips()
 
-        ZStack {
-            // Main Panel Content
-            VStack(spacing: 8) {
-                // Top Row: Pinboards & Search Header (Iconic Paste Bar)
+        ZStack(alignment: .bottom) {
+            // Edge-to-Edge Shelf Window
+            VStack(spacing: 4) {
+                // MARK: - Top Pinboards Bar (Paste header)
                 pinboardHeaderBar(itemsCount: items.count)
-                    .padding(.top, 6)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 24)
 
-                // Secondary Status Notification Strip (Paste Stack / Shield / Paused)
+                // Status Strip (if Paste Stack or Screen Privacy active)
                 statusNotificationStrip
+                    .padding(.horizontal, 24)
 
-                // Middle: Horizontal Card Deck
+                // MARK: - Card Deck (Horizontal Carousel)
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 14) {
+                        LazyHStack(spacing: 16) {
                             if items.isEmpty {
                                 emptyStateView
                             } else {
@@ -97,8 +99,8 @@ public struct ClipboardBarView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 6)
                     }
                     .onChange(of: controller.selectedIndex) { _, newIndex in
                         if newIndex >= 0 && newIndex < items.count {
@@ -108,31 +110,29 @@ public struct ClipboardBarView: View {
                         }
                     }
                 }
-                .frame(height: 185)
+                .frame(height: 236)
 
-                // Footer Bar: Paste Shortcuts Tips
+                // MARK: - Footer Bar
                 footerBar(itemsCount: items.count)
+                    .padding(.horizontal, 24)
                     .padding(.bottom, 6)
             }
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, maxHeight: 330)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(reduceTransparency ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .windowBackgroundColor).opacity(0.85))
+                    Rectangle()
+                        .fill(reduceTransparency ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .windowBackgroundColor).opacity(0.88))
                         .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            Rectangle()
                                 .fill(.ultraThinMaterial)
                         )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(
-                        Color.primary.opacity(colorSchemeContrast == .increased ? 0.35 : (colorScheme == .dark ? 0.18 : 0.10)),
-                        lineWidth: colorSchemeContrast == .increased ? 1.5 : 1
-                    )
-            )
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.primary.opacity(colorSchemeContrast == .increased ? 0.35 : (colorScheme == .dark ? 0.18 : 0.10)))
+                    .frame(height: 1)
+            }
 
             // Floating Toast Notification Banner
             if let message = controller.toastMessage {
@@ -166,18 +166,18 @@ public struct ClipboardBarView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
                     .background(
                         Capsule()
                             .fill(Color(nsColor: .windowBackgroundColor))
-                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.15), radius: 8, x: 0, y: 3)
+                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.15), radius: 10, x: 0, y: 4)
                     )
                     .overlay(
                         Capsule()
                             .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                     )
-                    .padding(.top, 6)
+                    .padding(.top, 8)
 
                     Spacer()
                 }
@@ -309,7 +309,7 @@ public struct ClipboardBarView: View {
                 .zIndex(340)
             }
         }
-        .frame(width: 980, height: 290)
+        .frame(maxWidth: .infinity, maxHeight: 330)
         .onAppear {
             controller.focusSearchTrigger = {
                 isSearchFieldFocused = true
@@ -317,115 +317,12 @@ public struct ClipboardBarView: View {
         }
     }
 
-    // MARK: - Pinboards Header Bar (Signature Paste Feature)
+    // MARK: - Pinboards Header Bar (Exact Paste Style)
 
     private func pinboardHeaderBar(itemsCount: Int) -> some View {
-        HStack(spacing: 8) {
-            // Pinboards tabs
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 5) {
-                    // 1. Main Clipboard History Tab
-                    Button(action: {
-                        controller.selectedCollectionId = nil
-                        controller.selectedFilter = .all
-                        controller.selectedIndex = 0
-                    }) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("Clipboard History")
-                                .font(.system(size: 11.5, weight: (controller.selectedCollectionId == nil && controller.selectedFilter != .deleted) ? .bold : .medium))
-
-                            if controller.selectedCollectionId == nil && controller.selectedFilter != .deleted {
-                                Text("\(storage.clips.count)")
-                                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                                    .padding(.horizontal, 4.5)
-                                    .padding(.vertical, 1)
-                                    .background(Capsule().fill(Color.primary.opacity(0.12)))
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .foregroundColor((controller.selectedCollectionId == nil && controller.selectedFilter != .deleted) ? .primary : .secondary)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill((controller.selectedCollectionId == nil && controller.selectedFilter != .deleted) ? Color(nsColor: .selectedControlColor).opacity(0.35) : Color.clear)
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    // 2. Custom Pinboards
-                    ForEach(storage.collections) { pinboard in
-                        let isSelected = controller.selectedCollectionId == pinboard.id
-                        let pinboardColor = Color(hex: pinboard.colorHex)
-                        let count = storage.clips.filter { $0.collectionId == pinboard.id }.count
-
-                        Button(action: {
-                            controller.selectedCollectionId = pinboard.id
-                            controller.selectedFilter = .all
-                            controller.selectedIndex = 0
-                        }) {
-                            HStack(spacing: 5) {
-                                Circle()
-                                    .fill(pinboardColor)
-                                    .frame(width: 8, height: 8)
-
-                                Text(pinboard.name)
-                                    .font(.system(size: 11.5, weight: isSelected ? .bold : .medium))
-
-                                Text("\(count)")
-                                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                                    .padding(.horizontal, 4.5)
-                                    .padding(.vertical, 1)
-                                    .background(Capsule().fill(isSelected ? pinboardColor.opacity(0.25) : Color.primary.opacity(0.1)))
-                                    .foregroundColor(isSelected ? pinboardColor : .secondary)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .foregroundColor(isSelected ? .primary : .secondary)
-                            .background(
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(isSelected ? pinboardColor.opacity(0.15) : Color.clear)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Delete Pinboard", role: .destructive) {
-                                storage.removeCollection(id: pinboard.id)
-                                if controller.selectedCollectionId == pinboard.id {
-                                    controller.selectedCollectionId = nil
-                                }
-                            }
-                        }
-                    }
-
-                    // 3. Add Pinboard Button (+)
-                    Button(action: {
-                        controller.showNewCollectionSheet = true
-                    }) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("New Pinboard")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .foregroundColor(.secondary)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .stroke(Color.primary.opacity(0.15), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .help("Create New Pinboard (⇧⌘N)")
-                }
-            }
-
-            Spacer()
-
-            // Search Bar (Command + F)
-            HStack(spacing: 5) {
+        HStack(spacing: 12) {
+            // Search Input Field
+            HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
                     .font(.system(size: 12))
@@ -448,104 +345,166 @@ public struct ClipboardBarView: View {
                 }
             }
             .padding(.horizontal, 9)
-            .padding(.vertical, 4.5)
+            .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.8))
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.85))
             )
-            .frame(width: 175)
+            .frame(width: 190)
 
-            // Content Type Filter Menu
-            Menu {
-                ForEach(FloatingPanelController.FilterTab.allCases) { tab in
-                    Button(tab.title) {
-                        controller.selectedFilter = tab
+            Spacer()
+
+            // Centered Pinboards Bar
+            HStack(spacing: 8) {
+                // Clipboard History (Default tab)
+                let isHistorySelected = controller.selectedCollectionId == nil && controller.selectedFilter != .deleted
+                Button(action: {
+                    controller.selectedCollectionId = nil
+                    controller.selectedFilter = .all
+                    controller.selectedIndex = 0
+                }) {
+                    Text("Clipboard History")
+                        .font(.system(size: 12, weight: isHistorySelected ? .bold : .medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 5)
+                        .foregroundColor(isHistorySelected ? .white : .primary)
+                        .background(
+                            Capsule()
+                                .fill(isHistorySelected ? Color.secondary.opacity(0.8) : Color.primary.opacity(0.06))
+                        )
+                }
+                .buttonStyle(.plain)
+
+                // Custom Pinboard Pills (with colorful dots matching Paste screenshot!)
+                ForEach(storage.collections) { pinboard in
+                    let isSelected = controller.selectedCollectionId == pinboard.id
+                    let pinboardColor = Color(hex: pinboard.colorHex)
+
+                    Button(action: {
+                        controller.selectedCollectionId = pinboard.id
+                        controller.selectedFilter = .all
                         controller.selectedIndex = 0
+                    }) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(pinboardColor)
+                                .frame(width: 9, height: 9)
+
+                            Text(pinboard.name)
+                                .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .foregroundColor(isSelected ? .white : .primary)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? pinboardColor : Color.primary.opacity(0.06))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Delete Pinboard", role: .destructive) {
+                            storage.removeCollection(id: pinboard.id)
+                            if controller.selectedCollectionId == pinboard.id {
+                                controller.selectedCollectionId = nil
+                            }
+                        }
                     }
                 }
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: controller.selectedFilter.iconName)
-                        .font(.system(size: 10))
-                    Text(controller.selectedFilter == .all ? "Type" : controller.selectedFilter.title)
-                        .font(.system(size: 10.5))
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.06)))
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
 
-            // Paste Stack toggle button (Feature 9)
-            Button(action: {
-                seqQueue.toggleQueueMode()
-                controller.showToast(message: seqQueue.isQueueActive ? "Paste Stack Active" : "Paste Stack Deactivated")
-            }) {
-                HStack(spacing: 3) {
-                    Image(systemName: seqQueue.isQueueActive ? "square.stack.3d.down.right.fill" : "square.stack.3d.down.right")
-                        .font(.system(size: 11))
-                    if seqQueue.isQueueActive {
-                        Text("\(seqQueue.queue.count)")
-                            .font(.system(size: 9, weight: .bold))
+                // Add Pinboard Button (+)
+                Button(action: {
+                    controller.showNewCollectionSheet = true
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(Color.primary.opacity(0.06)))
+                }
+                .buttonStyle(.plain)
+                .help("New Pinboard (⇧⌘N)")
+            }
+
+            Spacer()
+
+            // Right side: Quick Action Tools & Options Menu (•••)
+            HStack(spacing: 8) {
+                // Paste Stack toggle button
+                Button(action: {
+                    seqQueue.toggleQueueMode()
+                    controller.showToast(message: seqQueue.isQueueActive ? "Paste Stack Active" : "Paste Stack Deactivated")
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: seqQueue.isQueueActive ? "square.stack.3d.down.right.fill" : "square.stack.3d.down.right")
+                            .font(.system(size: 12))
+                        if seqQueue.isQueueActive {
+                            Text("\(seqQueue.queue.count)")
+                                .font(.system(size: 9.5, weight: .bold))
+                        }
                     }
+                    .foregroundColor(seqQueue.isQueueActive ? .accentColor : .secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(seqQueue.isQueueActive ? Color.accentColor.opacity(0.18) : Color.clear))
                 }
-                .foregroundColor(seqQueue.isQueueActive ? .accentColor : .secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 6).fill(seqQueue.isQueueActive ? Color.accentColor.opacity(0.15) : Color.clear))
-            }
-            .buttonStyle(.plain)
-            .help(seqQueue.isQueueActive ? "Paste Stack Active (Sequential Paste)" : "Activate Paste Stack")
+                .buttonStyle(.plain)
+                .help(seqQueue.isQueueActive ? "Paste Stack Active" : "Activate Paste Stack")
 
-            // Screen Privacy Shield toggle (Feature 15)
-            Button(action: {
-                privacy.toggleShield()
-            }) {
-                Image(systemName: privacy.isShieldActive ? "eye.slash.fill" : "eye")
-                    .font(.system(size: 11))
-                    .foregroundColor(privacy.isShieldActive ? .orange : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help(privacy.isShieldActive ? "Screen Privacy Active (Blurring content)" : "Toggle Screen Privacy")
+                // Screen Privacy Shield button
+                Button(action: {
+                    privacy.toggleShield()
+                }) {
+                    Image(systemName: privacy.isShieldActive ? "eye.slash.fill" : "eye")
+                        .font(.system(size: 12))
+                        .foregroundColor(privacy.isShieldActive ? .orange : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Screen Privacy Shield")
 
-            // Pause Monitoring toggle (Feature 14 & ⌘T)
-            Button(action: {
-                monitor.togglePause()
-                let status = monitor.isPaused ? "Monitoring Paused (⌘T)" : "Monitoring Resumed (⌘T)"
-                controller.showToast(message: status)
-            }) {
-                Image(systemName: monitor.isPaused ? "pause.circle.fill" : "play.circle")
-                    .font(.system(size: 11))
-                    .foregroundColor(monitor.isPaused ? .red : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help(monitor.isPaused ? "Monitoring Paused (Click or ⌘T to resume)" : "Pause Monitoring (⌘T)")
+                // More Options Menu (••• like Paste)
+                Menu {
+                    Button(action: {
+                        controller.showNewClipSheet = true
+                    }) {
+                        Label("New Text Item (⌘N)", systemImage: "plus")
+                    }
 
-            // New Item button (Command + N)
-            Button(action: {
-                controller.showNewClipSheet = true
-            }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("New Text Item (⌘N)")
+                    Button(action: {
+                        monitor.togglePause()
+                        let status = monitor.isPaused ? "Monitoring Paused (⌘T)" : "Monitoring Resumed (⌘T)"
+                        controller.showToast(message: status)
+                    }) {
+                        Label(monitor.isPaused ? "Resume Monitoring (⌘T)" : "Pause Monitoring (⌘T)", systemImage: monitor.isPaused ? "play.circle" : "pause.circle")
+                    }
 
-            // Settings button
-            Button(action: {
-                controller.hide()
-                MenuBarController.shared.openSettingsAction()
-            }) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    Divider()
+
+                    Button(action: {
+                        controller.selectedFilter = (controller.selectedFilter == .deleted) ? .all : .deleted
+                        controller.selectedIndex = 0
+                    }) {
+                        Label("Trash (\(storage.deletedClips.count))", systemImage: "trash")
+                    }
+
+                    Divider()
+
+                    Button(action: {
+                        controller.hide()
+                        MenuBarController.shared.openSettingsAction()
+                    }) {
+                        Label("Settings… (⌘,)", systemImage: "gearshape")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.secondary)
+                        .padding(5)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
-            .buttonStyle(.plain)
-            .help("Settings (⌘,)")
         }
-        .padding(.horizontal, 18)
     }
 
     // MARK: - Status Strip
@@ -595,7 +554,6 @@ public struct ClipboardBarView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 18)
             .padding(.top, -2)
         }
     }
@@ -632,7 +590,7 @@ public struct ClipboardBarView: View {
             Spacer()
 
             HStack(spacing: 12) {
-                keyTip(key: "↵", desc: "Paste")
+                keyTip(key: "↵", desc: "Paste to \(controller.previousApp?.localizedName ?? "App")")
                 keyTip(key: "⇧↵", desc: "Plain Text")
                 keyTip(key: "Space", desc: "Quick Look")
                 keyTip(key: "⌘E", desc: "Edit")
@@ -655,7 +613,6 @@ public struct ClipboardBarView: View {
                 }
             }
         }
-        .padding(.horizontal, 18)
     }
 
     private func keyTip(key: String, desc: String) -> some View {
@@ -753,6 +710,6 @@ public struct ClipboardBarView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .frame(width: 930, height: 180, alignment: .center)
+        .frame(maxWidth: .infinity, maxHeight: 220, alignment: .center)
     }
 }
