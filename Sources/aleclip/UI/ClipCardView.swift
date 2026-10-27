@@ -155,8 +155,25 @@ public struct ClipCardView: View {
 
                     Spacer()
 
-                    // Quick Paste Number Badge (if 1...9)
-                    if let num = shortcutNumber {
+                    // If Deleted: show Restore Pill; otherwise Quick Paste Number Badge (if 1...9)
+                    if isDeleted, let onRestore = onRestore {
+                        Button(action: onRestore) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                Text("Restore")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2.5)
+                            .background(
+                                Capsule().fill(Color.black.opacity(0.35))
+                            )
+                            .foregroundColor(.white)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Restore this clip to active history (↵)")
+                    } else if let num = shortcutNumber {
                         Text("⌘\(num)")
                             .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
                             .padding(.horizontal, 4)

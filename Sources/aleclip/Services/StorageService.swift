@@ -229,6 +229,22 @@ public final class StorageService: ObservableObject {
     }
 
     @discardableResult
+    public func restoreAllDeleted() -> Int {
+        guard !deletedClips.isEmpty else { return 0 }
+        let count = deletedClips.count
+        for item in deletedClips.reversed() {
+            clips.removeAll { $0.id == item.id }
+            clips.insert(item, at: 0)
+        }
+        deletedClips.removeAll()
+        undoStack.removeAll()
+
+        scheduleSaveHistory()
+        saveDeletedHistory()
+        return count
+    }
+
+    @discardableResult
     public func undoLastDelete() -> ClipItem? {
         guard let last = undoStack.popLast() else { return nil }
         let clip = last.clip

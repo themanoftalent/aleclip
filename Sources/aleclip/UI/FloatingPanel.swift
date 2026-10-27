@@ -636,6 +636,13 @@ public final class FloatingPanelController: ObservableObject {
         }
     }
 
+    public func restoreAllDeleted() {
+        let count = StorageService.shared.restoreAllDeleted()
+        showToast(message: "\(loc("toast.restored")): \(count) items")
+        self.selectedFilter = .all
+        self.selectedIndex = 0
+    }
+
     public func editSelected() {
         let items = filteredClips()
         guard selectedIndex >= 0 && selectedIndex < items.count else { return }

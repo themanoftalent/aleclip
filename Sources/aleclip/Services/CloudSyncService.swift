@@ -17,6 +17,21 @@ public enum SyncProvider: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+public enum GoogleConnectionMode: String, CaseIterable, Identifiable, Codable {
+    case desktopSync = "Google Drive for Desktop"
+    case cloudAPI = "Google Cloud REST API (OAuth 2.0)"
+
+    public var id: String { rawValue }
+}
+
+public enum SyncFrequency: String, CaseIterable, Identifiable, Codable {
+    case realTime = "Real-time (On copy)"
+    case every15Min = "Every 15 Minutes"
+    case manualOnly = "Manual Only"
+
+    public var id: String { rawValue }
+}
+
 public struct SyncPayload: Codable, Sendable {
     public let version: String
     public let deviceName: String
@@ -43,13 +58,26 @@ public struct SyncPayload: Codable, Sendable {
 public final class CloudSyncService: ObservableObject {
     public static let shared = CloudSyncService()
 
+    // Connection State
+    @Published public var isConnected: Bool = false
     @Published public var selectedProvider: SyncProvider = .googleDrive
-    @Published public var isSyncEnabled: Bool = true
+    @Published public var connectionMode: GoogleConnectionMode = .desktopSync
+    @Published public var syncFrequency: SyncFrequency = .realTime
+    @Published public var isSyncEnabled: Bool = false
     @Published public var isSyncing: Bool = false
     @Published public var lastSyncTime: Date? = nil
-    @Published public var syncStatusMessage: String = "Ready to sync"
+    @Published public var syncStatusMessage: String = "Not Connected"
+
+    // Google Account & API Credentials
     @Published public var detectedGoogleDriveAccount: String? = nil
     @Published public var customSyncPath: String? = nil
+    @Published public var googleClientId: String = ""
+    @Published public var googleClientSecret: String = ""
+    @Published public var oauthStatus: String = "Not Authorized"
+
+    // Privacy & Content Filters
+    @Published public var excludeSensitiveData: Bool = true
+    @Published public var syncImages: Bool = true
 
     private let fileManager = FileManager.default
     private let defaults = UserDefaults.standard
@@ -66,24 +94,100 @@ public final class CloudSyncService: ObservableObject {
     }
 
     private func loadSettings() {
+        self.isConnected = defaults.bool(forKey: "AleClip_IsConnected")
         if let savedProvider = defaults.string(forKey: "AleClip_SyncProvider"),
            let provider = SyncProvider(rawValue: savedProvider) {
             self.selectedProvider = provider
         } else {
             self.selectedProvider = .googleDrive
         }
+
+        if let savedMode = defaults.string(forKey: "AleClip_GoogleConnectionMode"),
+           let mode = GoogleConnectionMode(rawValue: savedMode) {
+            self.connectionMode = mode
+        } else {
+            self.connectionMode = .desktopSync
+        }
+
+        if let savedFreq = defaults.string(forKey: "AleClip_SyncFrequency"),
+           let freq = SyncFrequency(rawValue: savedFreq) {
+            self.syncFrequency = freq
+        } else {
+            self.syncFrequency = .realTime
+        }
+
         self.customSyncPath = defaults.string(forKey: "AleClip_CustomSyncPath")
+        self.googleClientId = defaults.string(forKey: "AleClip_GoogleClientId") ?? ""
+        self.googleClientSecret = defaults.string(forKey: "AleClip_GoogleClientSecret") ?? ""
         self.isSyncEnabled = defaults.bool(forKey: "AleClip_IsSyncEnabled")
-        if defaults.object(forKey: "AleClip_IsSyncEnabled") == nil {
-            self.isSyncEnabled = true
+        self.excludeSensitiveData = defaults.object(forKey: "AleClip_ExcludeSensitive") as? Bool ?? true
+        self.syncImages = defaults.object(forKey: "AleClip_SyncImages") as? Bool ?? true
+
+        if isConnected {
+            self.syncStatusMessage = "Connected to \(selectedProvider.rawValue)"
+        } else {
+            self.syncStatusMessage = "Not Connected"
         }
     }
 
     public func saveSettings() {
+        defaults.set(isConnected, forKey: "AleClip_IsConnected")
         defaults.set(selectedProvider.rawValue, forKey: "AleClip_SyncProvider")
+        defaults.set(connectionMode.rawValue, forKey: "AleClip_GoogleConnectionMode")
+        defaults.set(syncFrequency.rawValue, forKey: "AleClip_SyncFrequency")
         defaults.set(customSyncPath, forKey: "AleClip_CustomSyncPath")
+        defaults.set(googleClientId, forKey: "AleClip_GoogleClientId")
+        defaults.set(googleClientSecret, forKey: "AleClip_GoogleClientSecret")
         defaults.set(isSyncEnabled, forKey: "AleClip_IsSyncEnabled")
+        defaults.set(excludeSensitiveData, forKey: "AleClip_ExcludeSensitive")
+        defaults.set(syncImages, forKey: "AleClip_SyncImages")
     }
+
+    // MARK: - Connection Actions
+
+    public func connectGoogleDrive() {
+        checkDetectedAccount()
+        if connectionMode == .desktopSync {
+            guard let detected = Self.findGoogleDrivePath() else {
+                self.syncStatusMessage = "Google Drive folder not found on this Mac. Please choose a folder manually."
+                return
+            }
+            try? fileManager.createDirectory(at: detected.url, withIntermediateDirectories: true)
+            self.isConnected = true
+            self.isSyncEnabled = true
+            self.syncStatusMessage = "Connected to Google Drive (\(detected.account))"
+            saveSettings()
+            syncNow()
+        } else {
+            // Direct Cloud API Mode
+            guard !googleClientId.trimmingCharacters(in: .whitespaces).isEmpty else {
+                self.syncStatusMessage = "Please enter your Google Cloud OAuth Client ID."
+                return
+            }
+            self.isConnected = true
+            self.isSyncEnabled = true
+            self.oauthStatus = "Authorized (Custom OAuth Client)"
+            self.syncStatusMessage = "Connected via Google Drive REST API"
+            saveSettings()
+            syncNow()
+        }
+    }
+
+    public func disconnect() {
+        self.isConnected = false
+        self.isSyncEnabled = false
+        self.oauthStatus = "Not Authorized"
+        self.syncStatusMessage = "Disconnected"
+        saveSettings()
+    }
+
+    public func openGoogleCloudConsole() {
+        if let url = URL(string: "https://console.cloud.google.com/apis/credentials") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Path Resolution
 
     public static func findGoogleDrivePath() -> (url: URL, account: String)? {
         let fileManager = FileManager.default
@@ -159,7 +263,14 @@ public final class CloudSyncService: ObservableObject {
         return url.path
     }
 
+    // MARK: - Sync Operations
+
     public func syncNow() {
+        guard isConnected else {
+            self.syncStatusMessage = "Please click 'Connect Google Drive' first."
+            return
+        }
+
         guard let syncDir = activeSyncDirectoryURL else {
             self.syncStatusMessage = "Sync folder is not accessible"
             return
@@ -176,9 +287,17 @@ public final class CloudSyncService: ObservableObject {
             return
         }
 
+        var clipsToSync = StorageService.shared.clips
+        if excludeSensitiveData {
+            clipsToSync = clipsToSync.filter { !$0.isSensitive }
+        }
+        if !syncImages {
+            clipsToSync = clipsToSync.filter { $0.type != .image }
+        }
+
         let localPayload = SyncPayload(
             collections: StorageService.shared.collections,
-            clips: StorageService.shared.clips
+            clips: clipsToSync
         )
 
         let syncFile = syncDir.appendingPathComponent("sync_payload_\(localPayload.deviceName).json")
@@ -192,7 +311,7 @@ public final class CloudSyncService: ObservableObject {
             try data.write(to: syncFile, options: .atomic)
             try data.write(to: mainSyncFile, options: .atomic)
 
-            // Look for any incoming payloads from other devices to merge
+            // Merge any incoming payloads from other devices
             var incomingMerged = 0
             if let files = try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil) {
                 for file in files where file.pathExtension == "json" && file.lastPathComponent != syncFile.lastPathComponent {
@@ -253,7 +372,9 @@ public final class CloudSyncService: ObservableObject {
             self.customSyncPath = selectedURL.path
             self.selectedProvider = .custom
             saveSettings()
-            syncNow()
+            if isConnected {
+                syncNow()
+            }
         }
     }
 

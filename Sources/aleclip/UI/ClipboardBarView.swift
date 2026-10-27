@@ -736,6 +736,18 @@ public struct ClipboardBarView: View {
                         .foregroundColor(.red)
 
                     if !storage.deletedClips.isEmpty {
+                        Button(action: {
+                            controller.restoreAllDeleted()
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "arrow.counterclockwise.circle.fill")
+                                Text("Recover All (Tümünü Geri Yükle)")
+                                    .fontWeight(.bold)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
+
                         Button("Empty Trash") {
                             storage.emptyTrash()
                             controller.showToast(message: "Trash emptied")

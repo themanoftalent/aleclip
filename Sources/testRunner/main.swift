@@ -148,13 +148,29 @@ func runTests() {
     }
     print("  ✔ Reliable local storage backup creation passed")
 
-    // 13. Google Drive Auto-Detection & Sync
+    // 13. Recover All Deleted Clips
+    let clipA = ClipItem(type: .text, plainText: "Deleted Clip A", contentHash: "delA")
+    let clipB = ClipItem(type: .text, plainText: "Deleted Clip B", contentHash: "delB")
+    storage.addClip(clipA)
+    storage.addClip(clipB)
+    storage.deleteClip(id: clipA.id)
+    storage.deleteClip(id: clipB.id)
+    assert(storage.deletedClips.count >= 2, "Trash should hold deleted clips")
+    let restoredCount = storage.restoreAllDeleted()
+    assert(restoredCount >= 2, "restoreAllDeleted should restore all clips from trash")
+    assert(storage.deletedClips.isEmpty, "Trash should be empty after restoreAllDeleted")
+    assert(storage.clips.contains { $0.id == clipA.id }, "Clip A should be back in clips")
+    assert(storage.clips.contains { $0.id == clipB.id }, "Clip B should be back in clips")
+    print("  ✔ Recover all deleted clips passed")
+
+    // 14. Google Drive Connection & Sync
     let cloudSync = CloudSyncService.shared
     assert(cloudSync.selectedProvider == .googleDrive, "Google Drive should be default sync provider")
-    cloudSync.syncNow()
+    cloudSync.connectGoogleDrive()
+    assert(cloudSync.isConnected, "Google Drive should be connected after connectGoogleDrive()")
     assert(cloudSync.lastSyncTime != nil, "lastSyncTime should be recorded after sync")
     assert(cloudSync.syncStatusMessage.contains("✅"), "Sync status should indicate success")
-    print("  ✔ Google Drive cloud synchronization passed")
+    print("  ✔ Google Drive connection and cloud synchronization passed")
 
     print("\n✅ All AleClip extended unit tests passed successfully!")
 }

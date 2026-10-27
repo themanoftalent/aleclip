@@ -413,80 +413,223 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
     private var syncContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             // Google Drive / Cloud Sync Card
-            settingsCard(title: "Google Drive & Cloud Sync", icon: "externaldrive.badge.icloud") {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Synchronize your unlimited clipboard history, pinboards, and snippets securely across your devices via Google Drive or cloud storage.")
+            settingsCard(title: "Google Drive Synchronization", icon: "externaldrive.badge.icloud") {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Securely synchronize your clipboard history, pinboards, and templates with Google Drive across all your computers and devices.")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
 
-                    // Provider Picker
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Sync Provider")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
+                    // 1. Connection Status Banner
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(cloudSync.isConnected ? Color.green.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .frame(width: 38, height: 38)
 
-                        Picker("", selection: $cloudSync.selectedProvider) {
-                            ForEach(SyncProvider.allCases) { provider in
-                                Text(provider.rawValue).tag(provider)
-                            }
+                            Image(systemName: cloudSync.isConnected ? "checkmark.circle.fill" : "link.badge.plus")
+                                .foregroundColor(cloudSync.isConnected ? .green : .secondary)
+                                .font(.system(size: 18))
                         }
-                        .pickerStyle(.segmented)
-                        .onChange(of: cloudSync.selectedProvider) { _, _ in
-                            cloudSync.saveSettings()
-                        }
-                    }
 
-                    // Account & Folder Info Box
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 10) {
-                            Image(systemName: cloudSync.selectedProvider == .googleDrive ? "externaldrive.badge.checkmark" : "folder.fill")
-                                .foregroundColor(.accentColor)
-                                .font(.system(size: 16))
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(cloudSync.isConnected ? "Connected to Google Drive" : "Google Drive Not Connected")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(cloudSync.isConnected ? .primary : .secondary)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                if cloudSync.selectedProvider == .googleDrive {
-                                    HStack(spacing: 6) {
-                                        Text("Google Drive Account:")
-                                            .font(.system(size: 11.5, weight: .semibold))
-                                        Text(cloudSync.detectedGoogleDriveAccount ?? "themanoftalent@gmail.com")
-                                            .font(.system(size: 11.5, weight: .bold))
-                                            .foregroundColor(.accentColor)
-                                    }
-                                }
-
-                                HStack(spacing: 6) {
-                                    Text("Sync Folder:")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                    Text(cloudSync.displayPath)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(.primary)
-                                        .lineLimit(1)
+                                if cloudSync.isConnected {
+                                    Text("ACTIVE")
+                                        .font(.system(size: 8.5, weight: .bold))
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1)
+                                        .background(Capsule().fill(Color.green.opacity(0.2)))
+                                        .foregroundColor(.green)
                                 }
                             }
 
-                            Spacer()
+                            if cloudSync.isConnected {
+                                Text("Account: \(cloudSync.detectedGoogleDriveAccount ?? "themanoftalent@gmail.com") • Folder: \(cloudSync.displayPath)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("Select your connection method below and click Connect to link your account.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
 
-                            Button("Choose Folder…") {
-                                cloudSync.chooseCustomFolder()
+                        Spacer()
+
+                        if cloudSync.isConnected {
+                            Button("Disconnect") {
+                                cloudSync.disconnect()
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                        } else {
+                            Button(action: {
+                                cloudSync.connectGoogleDrive()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "link")
+                                    Text("Connect Google Drive")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.regular)
                         }
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
                     }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(cloudSync.isConnected ? Color.green.opacity(0.06) : Color.primary.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(cloudSync.isConnected ? Color.green.opacity(0.25) : Color.primary.opacity(0.08), lineWidth: 1)
+                    )
 
-                    // Auto-sync Toggle
-                    Toggle("Automatically sync changes to \(cloudSync.selectedProvider.rawValue)", isOn: $cloudSync.isSyncEnabled)
-                        .font(.system(size: 13, weight: .medium))
-                        .onChange(of: cloudSync.isSyncEnabled) { _, _ in
+                    // 2. Connection Method Selection
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Connection Method")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Picker("", selection: $cloudSync.connectionMode) {
+                            ForEach(GoogleConnectionMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: cloudSync.connectionMode) { _, _ in
                             cloudSync.saveSettings()
                         }
 
+                        if cloudSync.connectionMode == .desktopSync {
+                            // Desktop Sync explanation & folder options
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Uses your native macOS Google Drive for Desktop application to sync clipboard data locally without passing private API tokens over the web.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+
+                                HStack(spacing: 8) {
+                                    Image(systemName: "folder")
+                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 12))
+
+                                    Text(cloudSync.displayPath)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.primary)
+
+                                    Spacer()
+
+                                    Button("Choose Other Folder…") {
+                                        cloudSync.chooseCustomFolder()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                }
+                                .padding(8)
+                                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+                            }
+                            .padding(.top, 4)
+                        } else {
+                            // Cloud REST API fields
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Connect directly to Google Cloud Drive API using OAuth 2.0 Client credentials.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("OAuth 2.0 Client ID:")
+                                        .font(.system(size: 10.5, weight: .semibold))
+                                    TextField("e.g. 123456789-abcdef.apps.googleusercontent.com", text: $cloudSync.googleClientId)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .onChange(of: cloudSync.googleClientId) { _, _ in
+                                            cloudSync.saveSettings()
+                                        }
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("OAuth 2.0 Client Secret (Optional):")
+                                        .font(.system(size: 10.5, weight: .semibold))
+                                    SecureField("GOCSPX-...", text: $cloudSync.googleClientSecret)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .onChange(of: cloudSync.googleClientSecret) { _, _ in
+                                            cloudSync.saveSettings()
+                                        }
+                                }
+
+                                HStack(spacing: 10) {
+                                    Button("Open Google Cloud Console") {
+                                        cloudSync.openGoogleCloudConsole()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+
+                                    Spacer()
+
+                                    Text("Status: \(cloudSync.oauthStatus)")
+                                        .font(.system(size: 10.5))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(10)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+                        }
+                    }
+
                     Divider()
 
-                    // Action Buttons: Sync Now & Open in Finder
+                    // 3. Sync & Privacy Preferences
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Sync Preferences & Privacy")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Toggle("Automatically sync new copies to Google Drive", isOn: $cloudSync.isSyncEnabled)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .onChange(of: cloudSync.isSyncEnabled) { _, _ in
+                                cloudSync.saveSettings()
+                            }
+
+                        Toggle("Protect sensitive data (Exclude passwords, tokens, API keys from cloud)", isOn: $cloudSync.excludeSensitiveData)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .onChange(of: cloudSync.excludeSensitiveData) { _, _ in
+                                cloudSync.saveSettings()
+                            }
+
+                        Toggle("Include copied images and screenshots in cloud sync", isOn: $cloudSync.syncImages)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .onChange(of: cloudSync.syncImages) { _, _ in
+                                cloudSync.saveSettings()
+                            }
+
+                        HStack {
+                            Text("Sync Frequency:")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            Picker("", selection: $cloudSync.syncFrequency) {
+                                ForEach(SyncFrequency.allCases) { freq in
+                                    Text(freq.rawValue).tag(freq)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 180)
+                            .onChange(of: cloudSync.syncFrequency) { _, _ in
+                                cloudSync.saveSettings()
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // 4. Action Buttons: Sync Now & Open in Google Drive
                     HStack(spacing: 12) {
                         Button(action: {
                             cloudSync.syncNow()
@@ -499,14 +642,14 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
                                     Image(systemName: "arrow.triangle.2.circlepath")
                                         .font(.system(size: 12, weight: .bold))
                                 }
-                                Text(cloudSync.isSyncing ? "Syncing…" : "Sync Now")
+                                Text(cloudSync.isSyncing ? "Syncing…" : "Sync to Google Drive Now")
                                     .fontWeight(.bold)
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 7)
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(cloudSync.isSyncing)
+                        .disabled(!cloudSync.isConnected || cloudSync.isSyncing)
 
                         Button(action: {
                             cloudSync.openSyncFolderInFinder()
@@ -520,11 +663,12 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
                             .padding(.vertical, 7)
                         }
                         .buttonStyle(.bordered)
+                        .disabled(!cloudSync.isConnected)
 
                         Spacer()
 
                         Text(cloudSync.syncStatusMessage)
-                            .font(.system(size: 11.5, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(cloudSync.syncStatusMessage.contains("failed") ? .red : .secondary)
                             .lineLimit(1)
                     }
@@ -696,6 +840,35 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
                         model.activeAlert = .info(loc("settings.backup.clearSuccess"))
                     }
                     .buttonStyle(.bordered)
+                }
+            }
+
+            settingsCard(title: "Trash & Deleted Items Recovery", icon: "arrow.counterclockwise.circle.fill") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("AleClip preserves deleted clips in a safe local Trash bin so you can recover any accidentally deleted notes, codes, or images.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            let count = storage.restoreAllDeleted()
+                            model.activeAlert = .info("Restored \(count) deleted clips back to active clipboard history.")
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Recover All Deleted Clips (\(storage.deletedClips.count))")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(storage.deletedClips.isEmpty)
+
+                        Button("Empty Trash Permanently", role: .destructive) {
+                            storage.emptyTrash()
+                            model.activeAlert = .info("Trash has been permanently emptied.")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(storage.deletedClips.isEmpty)
+                    }
                 }
             }
         }
