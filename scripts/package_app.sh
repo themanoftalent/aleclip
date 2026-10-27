@@ -129,6 +129,7 @@ echo "✅ Successfully built DMG at ${DMG_PATH}!"
 # Update /Applications/AleClip.app
 echo "🚀 Updating /Applications/${APP_NAME}.app..."
 pkill -x aleclip 2>/dev/null || true
+sleep 0.8
 rm -rf "/Applications/${APP_NAME}.app"
 cp -R "${APP_BUNDLE}" "/Applications/${APP_NAME}.app"
 xattr -cr "/Applications/${APP_NAME}.app"

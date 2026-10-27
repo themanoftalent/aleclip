@@ -58,6 +58,20 @@ final class SettingsViewModel: ObservableObject {
     @Published var activeAlert: SettingsAlertItem? = nil
 }
 
+struct SettingsTabButtonStyle: ButtonStyle {
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.14) : (configuration.isPressed ? Color.primary.opacity(0.10) : Color.clear))
+            )
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .contentShape(Rectangle())
+    }
+}
+
 public struct SettingsView: View {
     @ObservedObject private var storage = StorageService.shared
     @ObservedObject private var l10n = LocalizationService.shared
@@ -131,7 +145,7 @@ public struct SettingsView: View {
     // MARK: - Top Tab Bar
 
     private var topTabBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Spacer()
             ForEach(SettingsTab.allCases) { tab in
                 let isSelected = model.selectedTab == tab
@@ -152,13 +166,18 @@ public struct SettingsView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
+                    .frame(minWidth: 72)
                     .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.8))
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-                    )
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SettingsTabButtonStyle(isSelected: isSelected))
+                .onHover { isHovering in
+                    if isHovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
             }
             Spacer()
         }
@@ -393,27 +412,126 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
 
     private var syncContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            settingsCard(title: "Cloud Synchronization", icon: "arrow.triangle.2.circlepath.icloud.fill") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Synchronize your clipboard history and collections securely across your Mac, iPhone, iPad, and other devices via iCloud Drive / Cloud container.")
+            // Google Drive / Cloud Sync Card
+            settingsCard(title: "Google Drive & Cloud Sync", icon: "externaldrive.badge.icloud") {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Synchronize your unlimited clipboard history, pinboards, and snippets securely across your devices via Google Drive or cloud storage.")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
 
-                    HStack {
-                        Button("Sync Now") {
+                    // Provider Picker
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Sync Provider")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Picker("", selection: $cloudSync.selectedProvider) {
+                            ForEach(SyncProvider.allCases) { provider in
+                                Text(provider.rawValue).tag(provider)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: cloudSync.selectedProvider) { _, _ in
+                            cloudSync.saveSettings()
+                        }
+                    }
+
+                    // Account & Folder Info Box
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: cloudSync.selectedProvider == .googleDrive ? "externaldrive.badge.checkmark" : "folder.fill")
+                                .foregroundColor(.accentColor)
+                                .font(.system(size: 16))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                if cloudSync.selectedProvider == .googleDrive {
+                                    HStack(spacing: 6) {
+                                        Text("Google Drive Account:")
+                                            .font(.system(size: 11.5, weight: .semibold))
+                                        Text(cloudSync.detectedGoogleDriveAccount ?? "themanoftalent@gmail.com")
+                                            .font(.system(size: 11.5, weight: .bold))
+                                            .foregroundColor(.accentColor)
+                                    }
+                                }
+
+                                HStack(spacing: 6) {
+                                    Text("Sync Folder:")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                    Text(cloudSync.displayPath)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                }
+                            }
+
+                            Spacer()
+
+                            Button("Choose Folder…") {
+                                cloudSync.chooseCustomFolder()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+                    }
+
+                    // Auto-sync Toggle
+                    Toggle("Automatically sync changes to \(cloudSync.selectedProvider.rawValue)", isOn: $cloudSync.isSyncEnabled)
+                        .font(.system(size: 13, weight: .medium))
+                        .onChange(of: cloudSync.isSyncEnabled) { _, _ in
+                            cloudSync.saveSettings()
+                        }
+
+                    Divider()
+
+                    // Action Buttons: Sync Now & Open in Finder
+                    HStack(spacing: 12) {
+                        Button(action: {
                             cloudSync.syncNow()
+                        }) {
+                            HStack(spacing: 6) {
+                                if cloudSync.isSyncing {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 12, weight: .bold))
+                                }
+                                Text(cloudSync.isSyncing ? "Syncing…" : "Sync Now")
+                                    .fontWeight(.bold)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
                         }
                         .buttonStyle(.borderedProminent)
+                        .disabled(cloudSync.isSyncing)
+
+                        Button(action: {
+                            cloudSync.openSyncFolderInFinder()
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "folder")
+                                    .font(.system(size: 11))
+                                Text("Open in Google Drive / Finder")
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                        }
+                        .buttonStyle(.bordered)
 
                         Spacer()
 
                         Text(cloudSync.syncStatusMessage)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundColor(cloudSync.syncStatusMessage.contains("failed") ? .red : .secondary)
+                            .lineLimit(1)
                     }
                 }
             }
 
+            // Shared Collections Card
             settingsCard(title: "Shared Collections", icon: "folder.badge.plus") {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Export collections into shareable `.aleclipcollection` bundles for team collaboration or import shared collections from peers.")
