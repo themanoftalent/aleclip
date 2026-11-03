@@ -6,3 +6,11 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+
+# Sensitive & local configs
+*.pem
+*.key
+rarreg.key
+local.properties
+*.bak
+.DS_Store
