@@ -50,7 +50,7 @@
 9. **Sequential Copy and Paste**: Queue mode (FIFO / LIFO) allowing you to copy multiple items into a queue and paste them sequentially in order.
 10. **Plain-Text Pasting**: Paste text stripped of rich formatting or HTML using configurable shortcuts (`⇧↵` or settings).
 11. **Clipboard Editing**: Full editing sheet (`⌘E`), quick renaming (`⌘R`), duplication, previewing (`Space`), and deletion.
-12. **Quick Paste**: Global non-activating shortcut (`⇧⌘V` or `⌥V`) opens history instantly without switching apps, plus direct number paste (`⌘1`–`⌘9`).
+12. **Quick Paste**: Global non-activating shortcut (`⌥V` / `Option + V`) opens history instantly without switching apps, plus direct number paste (`⌘1`–`⌘9`).
 13. **Shared Collections**: Export and import shareable collection bundles (`.aleclipcollection`) for seamless collaboration.
 14. **Advanced Privacy Controls**: Exclude selected apps, automatically mask sensitive information, and pause clipboard monitoring (`⌘T`).
 15. **Screen-Sharing Privacy**: Automatically hides clipboard content during screen sharing, presentations, and screen recordings.
@@ -71,7 +71,7 @@
 
 | Action | Shortcut |
 | :--- | :--- |
-| **Open clipboard history** | `Shift + Command + V` (`⇧⌘V`) or `⌥V` |
+| **Open clipboard history** | `Option + V` (`⌥V`) |
 | **Search clipboard** | `Command + F` (`⌘F`) |
 | **Edit selected item** | `Command + E` (`⌘E`) |
 | **Rename selected item** | `Command + R` (`⌘R`) |
