@@ -65,6 +65,16 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         openItem.target = self
         menu.addItem(openItem)
 
+        // 3b. Open the Google Drive / sync folder holding the copied clips
+        let driveItem = NSMenuItem(
+            title: "Open Clips in Google Drive",
+            action: #selector(openSyncFolderAction),
+            keyEquivalent: ""
+        )
+        driveItem.target = self
+        driveItem.toolTip = CloudSyncService.shared.activeSyncDirectoryURL?.path
+        menu.addItem(driveItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // 4. Recent Clips Header
@@ -126,6 +136,10 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         )
         quitItem.target = self
         menu.addItem(quitItem)
+    }
+
+    @objc private func openSyncFolderAction() {
+        CloudSyncService.shared.openSyncFolderInFinder()
     }
 
     @objc private func openPanelAction() {

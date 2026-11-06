@@ -80,13 +80,13 @@ public final class HotkeyManager: ObservableObject {
         // Register ⌥V (Option + V) as requested by user
         registerSingleHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey), id: 1)
 
-        // Register ⇧⌘V (Shift + Command + V) as dual convenience
-        registerSingleHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(cmdKey | shiftKey), id: 2)
+        // Only ⌥V plus the shortcut chosen in Settings are registered.
+        // (No hardcoded ⇧⌘V: AleClip must not respond to shortcuts the user didn't configure.)
 
         // Also register any custom option selected in Settings if different
         let saved = StorageService.shared.settings.selectedShortcut
         if let option = GlobalShortcutOption(rawValue: saved) {
-            if option != .optionV && option != .cmdShiftV {
+            if option != .optionV {
                 registerSingleHotkey(keyCode: option.keyCode, modifiers: option.modifiers, id: 3)
             }
         }

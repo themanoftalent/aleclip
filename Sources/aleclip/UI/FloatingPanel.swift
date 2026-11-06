@@ -62,6 +62,8 @@ public final class FloatingPanelController: ObservableObject {
 
     @Published public var multiSelectedIds: Set<UUID> = []
     @Published public var isMultiSelectMode: Bool = false
+    /// When true, the footer shows an inline "Delete all?" confirmation.
+    @Published public var isConfirmingDeleteAll: Bool = false
 
     @Published public var showShortcutsPopover: Bool = false
     @Published public var toastMessage: String? = nil
@@ -165,6 +167,7 @@ public final class FloatingPanelController: ObservableObject {
         self.showNewClipSheet = false
         self.multiSelectedIds.removeAll()
         self.isMultiSelectMode = false
+        self.isConfirmingDeleteAll = false
         self.showShortcutsPopover = false
         self.toastMessage = nil
         self.toastActionTitle = nil
@@ -424,6 +427,12 @@ public final class FloatingPanelController: ObservableObject {
                     return nil
                 }
 
+            case 0: // 'A' — ⌘A selects all visible clips (when not typing in search)
+                if flags.contains(.command) && (!self.isSearchFocused || self.searchText.isEmpty) {
+                    self.selectAllVisible()
+                    return nil
+                }
+
             case 43: // ','
                 if flags.contains(.command) {
                     self.hide()
@@ -585,10 +594,8 @@ public final class FloatingPanelController: ObservableObject {
 
     public func deleteSelected() {
         if !multiSelectedIds.isEmpty {
-            let items = filteredClips().filter { multiSelectedIds.contains($0.id) }
-            for item in items {
-                deleteClip(item)
-            }
+            let ids = Set(filteredClips().map(\.id)).intersection(multiSelectedIds)
+            bulkDelete(ids: ids)
             multiSelectedIds.removeAll()
             return
         }
@@ -597,6 +604,48 @@ public final class FloatingPanelController: ObservableObject {
         guard selectedIndex >= 0 && selectedIndex < items.count else { return }
         let toDelete = items[selectedIndex]
         deleteClip(toDelete)
+    }
+
+    /// Selects every clip currently visible (respects the active filter and search).
+    public func selectAllVisible() {
+        multiSelectedIds = Set(filteredClips().map(\.id))
+    }
+
+    /// Deletes the given clips in one batch. In the Deleted filter this is permanent.
+    private func bulkDelete(ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        let permanent = selectedFilter == .deleted
+        let count = StorageService.shared.deleteClips(ids: ids, permanent: permanent)
+        if permanent {
+            showToast(message: "\(count) \(count == 1 ? "clip" : "clips") permanently deleted")
+        } else {
+            showToast(message: "\(count) \(count == 1 ? "clip" : "clips") moved to Deleted")
+        }
+        let remaining = filteredClips().count
+        if selectedIndex >= remaining {
+            selectedIndex = max(0, remaining - 1)
+        }
+    }
+
+    /// Shows the inline "Delete all?" confirmation in the footer.
+    /// (A modal NSAlert is unreliable from this non-activating floating panel.)
+    public func confirmDeleteAll() {
+        guard !filteredClips().isEmpty else { return }
+        isConfirmingDeleteAll = true
+    }
+
+    public func cancelDeleteAll() {
+        isConfirmingDeleteAll = false
+    }
+
+    /// Deletes every clip visible in the current filter/search, optionally keeping pinned ones.
+    public func performDeleteAll(keepPinned: Bool) {
+        isConfirmingDeleteAll = false
+        let visible = filteredClips()
+        let targets = keepPinned ? visible.filter { !$0.isPinned } : visible
+        multiSelectedIds.removeAll()
+        bulkDelete(ids: Set(targets.map(\.id)))
+        selectedIndex = 0
     }
 
     public func deleteClip(_ clip: ClipItem) {

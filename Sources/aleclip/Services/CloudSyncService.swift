@@ -311,6 +311,9 @@ public final class CloudSyncService: ObservableObject {
             try data.write(to: syncFile, options: .atomic)
             try data.write(to: mainSyncFile, options: .atomic)
 
+            // Export each copied item as a standalone .txt (and .png if image) to Google Drive / Sync folder
+            exportClipsAsTextFiles(clipsToSync, to: syncDir)
+
             // Merge any incoming payloads from other devices
             var incomingMerged = 0
             if let files = try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil) {
@@ -406,5 +409,73 @@ public final class CloudSyncService: ObservableObject {
             return (firstCol, addedCount)
         }
         return (nil, 0)
+    }
+
+    // MARK: - Individual Text & Image File Export
+    public func exportClipsAsTextFiles(_ clips: [ClipItem], to syncDir: URL) {
+        for clip in clips {
+            exportSingleClip(clip, to: syncDir)
+        }
+    }
+
+    public func exportSingleClip(_ clip: ClipItem, to syncDir: URL? = nil) {
+        guard let dir = syncDir ?? activeSyncDirectoryURL else { return }
+        if excludeSensitiveData && clip.isSensitive { return }
+
+        // Layout: <sync dir>/yyyy-MM-dd/HHmm_word1-word2.txt  (e.g. 2026-10-27/2211_git-version.txt)
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HHmm"
+        let dayDir = dir.appendingPathComponent(dayFormatter.string(from: clip.createdAt), isDirectory: true)
+        try? fileManager.createDirectory(at: dayDir, withIntermediateDirectories: true)
+
+        let baseName = "\(timeFormatter.string(from: clip.createdAt))_\(Self.shortClipName(from: clip.displayTitle))"
+
+        let text = clip.plainText
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let textData = text.data(using: .utf8),
+           let textPath = uniqueExportURL(in: dayDir, baseName: baseName, ext: "txt", byteCount: textData.count) {
+            try? textData.write(to: textPath, options: .atomic)
+        }
+
+        if syncImages, let imgFileName = clip.imageFileName {
+            if let image = StorageService.shared.loadImageBlob(named: imgFileName),
+               let tiffData = image.tiffRepresentation,
+               let rep = NSBitmapImageRep(data: tiffData),
+               let pngData = rep.representation(using: .png, properties: [:]) {
+                if let imgPath = uniqueExportURL(in: dayDir, baseName: baseName, ext: "png", byteCount: pngData.count) {
+                    try? pngData.write(to: imgPath, options: .atomic)
+                }
+            }
+        }
+    }
+
+    /// First two words of the clip's first line, joined by "-" (e.g. "git --version" → "git-version").
+    /// Each word is capped at 15 characters; falls back to "clip".
+    public static func shortClipName(from title: String) -> String {
+        let firstLine = title.components(separatedBy: .newlines).first ?? ""
+        let words = firstLine
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .prefix(2)
+            .map { String($0.prefix(15)) }
+        return words.isEmpty ? "clip" : words.joined(separator: "-")
+    }
+
+    /// Returns where to write an export, or nil if an identical-size file is already there
+    /// (already exported). Name clashes with different content get "-2", "-3", … suffixes.
+    private func uniqueExportURL(in dir: URL, baseName: String, ext: String, byteCount: Int) -> URL? {
+        for n in 1...99 {
+            let name = n == 1 ? "\(baseName).\(ext)" : "\(baseName)-\(n).\(ext)"
+            let url = dir.appendingPathComponent(name)
+            guard let attrs = try? fileManager.attributesOfItem(atPath: url.path) else {
+                return url  // free name
+            }
+            if (attrs[.size] as? NSNumber)?.intValue == byteCount {
+                return nil  // same clip already exported
+            }
+        }
+        return nil
     }
 }

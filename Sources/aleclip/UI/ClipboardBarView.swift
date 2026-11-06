@@ -727,9 +727,48 @@ public struct ClipboardBarView: View {
 
     // MARK: - Footer Bar
 
+    private func deleteAllConfirmBar(itemsCount: Int) -> some View {
+        let permanent = controller.selectedFilter == .deleted
+        let pinnedCount = permanent ? 0 : controller.filteredClips().filter(\.isPinned).count
+        return HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 11))
+            Text(permanent
+                 ? "Permanently delete all \(itemsCount) \(itemsCount == 1 ? "clip" : "clips")? This cannot be undone."
+                 : "Delete all \(itemsCount) \(itemsCount == 1 ? "clip" : "clips")? Deleted keeps only the latest 100.")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.red)
+                .lineLimit(1)
+
+            Button("Delete All") {
+                controller.performDeleteAll(keepPinned: false)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .controlSize(.mini)
+
+            if pinnedCount > 0 && pinnedCount < itemsCount {
+                Button("Keep \(pinnedCount) Pinned") {
+                    controller.performDeleteAll(keepPinned: true)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+
+            Button("Cancel") {
+                controller.cancelDeleteAll()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+        }
+    }
+
     private func footerBar(itemsCount: Int) -> some View {
         HStack {
-            if controller.selectedFilter == .deleted {
+            if controller.isConfirmingDeleteAll && itemsCount > 0 {
+                deleteAllConfirmBar(itemsCount: itemsCount)
+            } else if controller.selectedFilter == .deleted {
                 HStack(spacing: 8) {
                     Image(systemName: "trash.fill")
                         .foregroundColor(.red)
@@ -779,6 +818,22 @@ public struct ClipboardBarView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.mini)
 
+                    Button(role: .destructive) {
+                        controller.deleteSelected()
+                    } label: {
+                        Label("Delete \(controller.multiSelectedIds.count) (⌫)", systemImage: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .controlSize(.mini)
+
+                    Button("Select All") {
+                        controller.selectAllVisible()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundColor(.accentColor)
+
                     Button("Clear") {
                         controller.multiSelectedIds.removeAll()
                     }
@@ -787,9 +842,31 @@ public struct ClipboardBarView: View {
                     .foregroundColor(.secondary)
                 }
             } else {
-                Text("\(itemsCount) \(itemsCount == 1 ? "clip" : "clips")")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.secondary)
+                HStack(spacing: 8) {
+                    Text("\(itemsCount) \(itemsCount == 1 ? "clip" : "clips")")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    if itemsCount > 0 {
+                        Button("Select All") {
+                            controller.selectAllVisible()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10))
+                        .foregroundColor(.accentColor)
+                        .help("Select every clip shown (⌘A)")
+
+                        Button(role: .destructive) {
+                            controller.confirmDeleteAll()
+                        } label: {
+                            Label("Delete All…", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .controlSize(.mini)
+                        .help("Delete every clip shown in this tab")
+                    }
+                }
             }
 
             Spacer()

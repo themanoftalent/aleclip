@@ -113,6 +113,14 @@ public final class StorageService: ObservableObject {
 
         pruneHistoryIfNeeded()
         scheduleSaveHistory()
+
+        // Sync new clip as .txt to Google Drive / Sync folder
+        if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
+            CloudSyncService.shared.exportSingleClip(clip)
+            if CloudSyncService.shared.syncFrequency == .realTime {
+                CloudSyncService.shared.syncNow()
+            }
+        }
     }
 
     public func updateClip(_ clip: ClipItem) {
@@ -286,6 +294,47 @@ public final class StorageService: ObservableObject {
 
         saveHistory()
         saveDeletedHistory()
+    }
+
+    /// Deletes many clips in one pass and saves once (fast even with very large histories).
+    /// Soft deletion moves clips to the Deleted bin (capped at 100, newest kept);
+    /// permanent deletion removes them from the Deleted bin and/or history for good.
+    @discardableResult
+    public func deleteClips(ids: Set<UUID>, permanent: Bool = false) -> Int {
+        guard !ids.isEmpty else { return 0 }
+
+        if permanent {
+            let removedDeleted = deletedClips.filter { ids.contains($0.id) }
+            let removedActive = clips.filter { ids.contains($0.id) }
+            deletedClips.removeAll { ids.contains($0.id) }
+            clips.removeAll { ids.contains($0.id) }
+            undoStack.removeAll { ids.contains($0.clip.id) }
+            for item in removedDeleted + removedActive {
+                cleanupBlobIfNotReferenced(filename: item.imageFileName)
+            }
+            if !removedActive.isEmpty { saveHistory() }
+            saveDeletedHistory()
+            return removedDeleted.count + removedActive.count
+        }
+
+        let removed = clips.filter { ids.contains($0.id) }
+        guard !removed.isEmpty else { return 0 }
+        clips.removeAll { ids.contains($0.id) }
+        undoStack.removeAll()
+
+        deletedClips.removeAll { ids.contains($0.id) }
+        deletedClips.insert(contentsOf: removed, at: 0)
+        if deletedClips.count > 100 {
+            let overflow = Array(deletedClips.suffix(from: 100))
+            deletedClips = Array(deletedClips.prefix(100))
+            for item in overflow {
+                cleanupBlobIfNotReferenced(filename: item.imageFileName)
+            }
+        }
+
+        saveHistory()
+        saveDeletedHistory()
+        return removed.count
     }
 
     // MARK: - Collections Management
