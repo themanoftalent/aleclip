@@ -60,6 +60,12 @@ public final class StorageService: ObservableObject {
 
     private var undoStack: [(clip: ClipItem, originalIndex: Int)] = []
 
+    /// Sync tombstones: contentHash -> when it was deleted. Shared with other devices so a
+    /// deletion on one device removes the clip everywhere instead of being merged back.
+    @Published public private(set) var tombstones: [String: Date] = [:]
+    private var tombstonesFileURL: URL { appSupportURL.appendingPathComponent("sync_tombstones.json") }
+    private static let tombstoneLifetime: TimeInterval = 60 * 60 * 24 * 60 // 60 days
+
     private init() {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         self.appSupportURL = appSupport.appendingPathComponent("AleClip", isDirectory: true)
@@ -75,6 +81,75 @@ public final class StorageService: ObservableObject {
         loadCollections()
         loadHistory()
         loadDeletedHistory()
+        loadTombstones()
+    }
+
+    // MARK: - Sync Tombstones
+
+    private func recordTombstones(for items: [ClipItem]) {
+        guard !items.isEmpty else { return }
+        let now = Date()
+        for item in items { tombstones[item.contentHash] = now }
+        saveTombstones()
+    }
+
+    private func clearTombstones(for items: [ClipItem]) {
+        var changed = false
+        for item in items where tombstones.removeValue(forKey: item.contentHash) != nil { changed = true }
+        if changed { saveTombstones() }
+    }
+
+    private func saveTombstones() {
+        let cutoff = Date().addingTimeInterval(-Self.tombstoneLifetime)
+        tombstones = tombstones.filter { $0.value > cutoff }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(tombstones) {
+            try? data.write(to: tombstonesFileURL, options: .atomic)
+        }
+    }
+
+    private func loadTombstones() {
+        guard let data = try? Data(contentsOf: tombstonesFileURL) else { return }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        tombstones = (try? decoder.decode([String: Date].self, from: data)) ?? [:]
+    }
+
+    /// Merges another device's clips and deletions. Never triggers a sync itself.
+    @discardableResult
+    public func applyRemote(clips remoteClips: [ClipItem], tombstones remoteTombstones: [String: Date]) -> (added: Int, removed: Int) {
+        var removed: [ClipItem] = []
+        var tombstonesChanged = false
+        for (hash, deletedAt) in remoteTombstones {
+            if let existing = tombstones[hash], existing >= deletedAt { continue }
+            tombstones[hash] = deletedAt
+            tombstonesChanged = true
+            removed += clips.filter { $0.contentHash == hash && $0.lastUsedAt <= deletedAt && !$0.isPinned }
+        }
+        if !removed.isEmpty {
+            let ids = Set(removed.map(\.id))
+            clips.removeAll { ids.contains($0.id) }
+            deletedClips.removeAll { ids.contains($0.id) }
+            deletedClips.insert(contentsOf: removed, at: 0)
+            if deletedClips.count > 100 { deletedClips = Array(deletedClips.prefix(100)) }
+        }
+
+        let localHashes = Set(clips.map(\.contentHash))
+        var added = 0
+        for clip in remoteClips where !localHashes.contains(clip.contentHash) {
+            if let deletedAt = tombstones[clip.contentHash], deletedAt >= clip.lastUsedAt { continue }
+            clips.append(clip)
+            added += 1
+        }
+        if added > 0 { clips.sort { $0.createdAt > $1.createdAt } }
+
+        if tombstonesChanged { saveTombstones() }
+        if added > 0 || !removed.isEmpty {
+            saveHistory()
+            saveDeletedHistory()
+        }
+        return (added, removed.count)
     }
 
     private func createDirectoriesIfNeeded() {
@@ -110,6 +185,7 @@ public final class StorageService: ObservableObject {
         } else {
             clips.insert(clip, at: 0)
         }
+        clearTombstones(for: [clip])
 
         pruneHistoryIfNeeded()
         scheduleSaveHistory()
@@ -190,6 +266,7 @@ public final class StorageService: ObservableObject {
             }
             if let index = clips.firstIndex(where: { $0.id == id }) {
                 let removed = clips.remove(at: index)
+                recordTombstones(for: [removed])
                 undoStack.removeAll { $0.clip.id == id }
                 cleanupBlobIfNotReferenced(filename: removed.imageFileName)
                 scheduleSaveHistory()
@@ -201,6 +278,7 @@ public final class StorageService: ObservableObject {
         // Soft deletion
         guard let index = clips.firstIndex(where: { $0.id == id }) else { return nil }
         let removed = clips.remove(at: index)
+        recordTombstones(for: [removed])
 
         undoStack.append((clip: removed, originalIndex: index))
         if undoStack.count > 50 {
@@ -226,6 +304,7 @@ public final class StorageService: ObservableObject {
     public func restoreClip(id: UUID) -> ClipItem? {
         guard let index = deletedClips.firstIndex(where: { $0.id == id }) else { return nil }
         let restored = deletedClips.remove(at: index)
+        clearTombstones(for: [restored])
         undoStack.removeAll { $0.clip.id == id }
 
         clips.removeAll { $0.id == restored.id }
@@ -240,6 +319,7 @@ public final class StorageService: ObservableObject {
     public func restoreAllDeleted() -> Int {
         guard !deletedClips.isEmpty else { return 0 }
         let count = deletedClips.count
+        clearTombstones(for: deletedClips)
         for item in deletedClips.reversed() {
             clips.removeAll { $0.id == item.id }
             clips.insert(item, at: 0)
@@ -256,6 +336,7 @@ public final class StorageService: ObservableObject {
     public func undoLastDelete() -> ClipItem? {
         guard let last = undoStack.popLast() else { return nil }
         let clip = last.clip
+        clearTombstones(for: [clip])
         let targetIndex = min(last.originalIndex, clips.count)
 
         deletedClips.removeAll { $0.id == clip.id }
@@ -278,6 +359,7 @@ public final class StorageService: ObservableObject {
 
     public func clearUnpinned() {
         let unpinned = clips.filter { !$0.isPinned }
+        recordTombstones(for: unpinned)
         for item in unpinned {
             deletedClips.removeAll { $0.id == item.id }
             deletedClips.insert(item, at: 0)
@@ -306,6 +388,7 @@ public final class StorageService: ObservableObject {
         if permanent {
             let removedDeleted = deletedClips.filter { ids.contains($0.id) }
             let removedActive = clips.filter { ids.contains($0.id) }
+            recordTombstones(for: removedActive)
             deletedClips.removeAll { ids.contains($0.id) }
             clips.removeAll { ids.contains($0.id) }
             undoStack.removeAll { ids.contains($0.clip.id) }
@@ -318,6 +401,7 @@ public final class StorageService: ObservableObject {
         }
 
         let removed = clips.filter { ids.contains($0.id) }
+        recordTombstones(for: removed)
         guard !removed.isEmpty else { return 0 }
         clips.removeAll { ids.contains($0.id) }
         undoStack.removeAll()

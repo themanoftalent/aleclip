@@ -38,19 +38,23 @@ public struct SyncPayload: Codable, Sendable {
     public let timestamp: Date
     public let collections: [ClipCollection]
     public let clips: [ClipItem]
+    /// contentHash -> deletion time. Optional so payloads from older versions still decode.
+    public let deletedHashes: [String: Date]?
 
     public init(
-        version: String = "2.1.0",
+        version: String = "2.2.0",
         deviceName: String = Host.current().localizedName ?? "Mac",
         timestamp: Date = Date(),
         collections: [ClipCollection],
-        clips: [ClipItem]
+        clips: [ClipItem],
+        deletedHashes: [String: Date]? = nil
     ) {
         self.version = version
         self.deviceName = deviceName
         self.timestamp = timestamp
         self.collections = collections
         self.clips = clips
+        self.deletedHashes = deletedHashes
     }
 }
 
@@ -287,27 +291,48 @@ public final class CloudSyncService: ObservableObject {
             return
         }
 
-        var clipsToSync = StorageService.shared.clips
-        if excludeSensitiveData {
-            clipsToSync = clipsToSync.filter { !$0.isSensitive }
-        }
-        if !syncImages {
-            clipsToSync = clipsToSync.filter { $0.type != .image }
-        }
-
-        let localPayload = SyncPayload(
-            collections: StorageService.shared.collections,
-            clips: clipsToSync
-        )
-
         // Sync data lives in a hidden ".sync" subfolder (Finder hides dot-folders),
-        // one file per device. The old visible root files are cleaned up below.
+        // one file per device (Mac, iPhone, Android). Old visible root files are cleaned up below.
+        let deviceName = Host.current().localizedName ?? "Mac"
         let hiddenSyncDir = syncDir.appendingPathComponent(".sync", isDirectory: true)
-        let ownFileName = "sync_payload_\(localPayload.deviceName).json"
+        let ownFileName = "sync_payload_\(deviceName).json"
         let syncFile = hiddenSyncDir.appendingPathComponent(ownFileName)
 
         do {
             try fileManager.createDirectory(at: hiddenSyncDir, withIntermediateDirectories: true)
+
+            // 1. Merge other devices first (clips + deletions), so our payload includes them.
+            //    applyRemote never triggers another sync (no recursion).
+            var incomingMerged = 0
+            let hiddenFiles = (try? fileManager.contentsOfDirectory(at: hiddenSyncDir, includingPropertiesForKeys: nil)) ?? []
+            let rootFiles = (try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil)) ?? []
+            let candidates = hiddenFiles + rootFiles.filter { $0.lastPathComponent.hasPrefix("sync_payload_") }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            for file in candidates where file.pathExtension == "json" && file.lastPathComponent != ownFileName {
+                guard let fileData = try? Data(contentsOf: file),
+                      let incoming = try? decoder.decode(SyncPayload.self, from: fileData) else { continue }
+                for col in incoming.collections where !StorageService.shared.collections.contains(where: { $0.id == col.id }) {
+                    StorageService.shared.addCollection(col)
+                }
+                let result = StorageService.shared.applyRemote(clips: incoming.clips, tombstones: incoming.deletedHashes ?? [:])
+                incomingMerged += result.added + result.removed
+            }
+
+            // 2. Write this Mac's payload.
+            var clipsToSync = StorageService.shared.clips
+            if excludeSensitiveData {
+                clipsToSync = clipsToSync.filter { !$0.isSensitive }
+            }
+            if !syncImages {
+                clipsToSync = clipsToSync.filter { $0.type != .image }
+            }
+            let localPayload = SyncPayload(
+                deviceName: deviceName,
+                collections: StorageService.shared.collections,
+                clips: clipsToSync,
+                deletedHashes: StorageService.shared.tombstones
+            )
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted
             encoder.dateEncodingStrategy = .iso8601
@@ -319,37 +344,8 @@ public final class CloudSyncService: ObservableObject {
                 try? fileManager.removeItem(at: syncDir.appendingPathComponent(legacy))
             }
 
-            // Export each copied item as a standalone .txt (and .png if image) to Google Drive / Sync folder
+            // 3. Export each clip as a standalone .txt (and .png if image) into the week folders.
             exportClipsAsTextFiles(clipsToSync, to: syncDir)
-
-            // Merge incoming payloads from other devices: hidden .sync folder, plus root-level
-            // files still written by other Macs running an older AleClip.
-            var incomingMerged = 0
-            let hiddenFiles = (try? fileManager.contentsOfDirectory(at: hiddenSyncDir, includingPropertiesForKeys: nil)) ?? []
-            let rootFiles = (try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil)) ?? []
-            let candidates = hiddenFiles + rootFiles.filter { $0.lastPathComponent.hasPrefix("sync_payload_") }
-            do {
-                let files = candidates
-                for file in files where file.pathExtension == "json" && file.lastPathComponent != ownFileName {
-                    if let fileData = try? Data(contentsOf: file) {
-                        let decoder = JSONDecoder()
-                        decoder.dateDecodingStrategy = .iso8601
-                        if let incomingPayload = try? decoder.decode(SyncPayload.self, from: fileData) {
-                            for col in incomingPayload.collections {
-                                if !StorageService.shared.collections.contains(where: { $0.id == col.id }) {
-                                    StorageService.shared.addCollection(col)
-                                }
-                            }
-                            for clip in incomingPayload.clips {
-                                if !StorageService.shared.clips.contains(where: { $0.contentHash == clip.contentHash }) {
-                                    StorageService.shared.addClip(clip)
-                                    incomingMerged += 1
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
             self.lastSyncTime = Date()
             let timeStr = Date().formatted(date: .omitted, time: .standard)
