@@ -300,24 +300,37 @@ public final class CloudSyncService: ObservableObject {
             clips: clipsToSync
         )
 
-        let syncFile = syncDir.appendingPathComponent("sync_payload_\(localPayload.deviceName).json")
-        let mainSyncFile = syncDir.appendingPathComponent("sync_payload.json")
+        // Sync data lives in a hidden ".sync" subfolder (Finder hides dot-folders),
+        // one file per device. The old visible root files are cleaned up below.
+        let hiddenSyncDir = syncDir.appendingPathComponent(".sync", isDirectory: true)
+        let ownFileName = "sync_payload_\(localPayload.deviceName).json"
+        let syncFile = hiddenSyncDir.appendingPathComponent(ownFileName)
 
         do {
+            try fileManager.createDirectory(at: hiddenSyncDir, withIntermediateDirectories: true)
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(localPayload)
             try data.write(to: syncFile, options: .atomic)
-            try data.write(to: mainSyncFile, options: .atomic)
+
+            // Remove this Mac's legacy visible copies (and the redundant generic duplicate).
+            for legacy in [ownFileName, "sync_payload.json"] {
+                try? fileManager.removeItem(at: syncDir.appendingPathComponent(legacy))
+            }
 
             // Export each copied item as a standalone .txt (and .png if image) to Google Drive / Sync folder
             exportClipsAsTextFiles(clipsToSync, to: syncDir)
 
-            // Merge any incoming payloads from other devices
+            // Merge incoming payloads from other devices: hidden .sync folder, plus root-level
+            // files still written by other Macs running an older AleClip.
             var incomingMerged = 0
-            if let files = try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil) {
-                for file in files where file.pathExtension == "json" && file.lastPathComponent != syncFile.lastPathComponent {
+            let hiddenFiles = (try? fileManager.contentsOfDirectory(at: hiddenSyncDir, includingPropertiesForKeys: nil)) ?? []
+            let rootFiles = (try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil)) ?? []
+            let candidates = hiddenFiles + rootFiles.filter { $0.lastPathComponent.hasPrefix("sync_payload_") }
+            do {
+                let files = candidates
+                for file in files where file.pathExtension == "json" && file.lastPathComponent != ownFileName {
                     if let fileData = try? Data(contentsOf: file) {
                         let decoder = JSONDecoder()
                         decoder.dateDecodingStrategy = .iso8601
@@ -422,15 +435,14 @@ public final class CloudSyncService: ObservableObject {
         guard let dir = syncDir ?? activeSyncDirectoryURL else { return }
         if excludeSensitiveData && clip.isSensitive { return }
 
-        // Layout: <sync dir>/yyyy-MM-dd/HHmm_word1-word2.txt  (e.g. 2026-10-27/2211_git-version.txt)
-        let dayFormatter = DateFormatter()
-        dayFormatter.dateFormat = "yyyy-MM-dd"
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HHmm"
-        let dayDir = dir.appendingPathComponent(dayFormatter.string(from: clip.createdAt), isDirectory: true)
+        // Layout: <sync dir>/<week folder>/MM-dd_HHmm_word1-word2.txt
+        // e.g. "2026-W44 (Oct 26 – Nov 1)/10-27_2211_git-version.txt"
+        let stampFormatter = DateFormatter()
+        stampFormatter.dateFormat = "MM-dd_HHmm"
+        let dayDir = dir.appendingPathComponent(Self.weekFolderName(for: clip.createdAt), isDirectory: true)
         try? fileManager.createDirectory(at: dayDir, withIntermediateDirectories: true)
 
-        let baseName = "\(timeFormatter.string(from: clip.createdAt))_\(Self.shortClipName(from: clip.displayTitle))"
+        let baseName = "\(stampFormatter.string(from: clip.createdAt))_\(Self.shortClipName(from: clip.displayTitle))"
 
         let text = clip.plainText
         if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -449,6 +461,21 @@ public final class CloudSyncService: ObservableObject {
                 }
             }
         }
+    }
+
+    /// ISO-8601 week folder name, Monday–Sunday: "2026-W44 (Oct 26 – Nov 1)".
+    public static func weekFolderName(for date: Date) -> String {
+        var cal = Calendar(identifier: .iso8601)
+        cal.timeZone = .current
+        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        let start = cal.date(from: comps) ?? date
+        let end = cal.date(byAdding: .day, value: 6, to: start) ?? date
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "MMM d"
+        let year = comps.yearForWeekOfYear ?? cal.component(.year, from: date)
+        let week = String(format: "%02d", comps.weekOfYear ?? 1)
+        return "\(year)-W\(week) (\(fmt.string(from: start)) – \(fmt.string(from: end)))"
     }
 
     /// First two words of the clip's first line, joined by "-" (e.g. "git --version" → "git-version").
