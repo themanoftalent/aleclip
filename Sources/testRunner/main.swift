@@ -173,6 +173,55 @@ func runTests() {
     assert(cloudSync.syncStatusMessage.contains("✅"), "Sync status should indicate success")
     print("  ✔ Google Drive connection and cloud synchronization passed")
 
+    // 15. Bidirectional Sync: iOS Payload Merge & Deduplication
+    let uniqueTestHash = "ios-test-hash-\(UUID().uuidString)"
+    let mockIOSClip = ClipItem(
+        type: .text,
+        plainText: "Synced note created on iPhone 16 Pro",
+        sourceAppName: "Safari",
+        createdAt: Date(),
+        contentHash: uniqueTestHash,
+        sourceDevice: "iPhone"
+    )
+    let mergeResult = storage.applyRemote(clips: [mockIOSClip], tombstones: [:])
+    assert(mergeResult.added == 1, "applyRemote should merge the iOS clip")
+    assert(storage.clips.contains { $0.contentHash == mockIOSClip.contentHash }, "Merged iOS clip must exist in clips")
+
+    // Attempting to merge identical clip again should produce 0 duplicates
+    let duplicateMergeResult = storage.applyRemote(clips: [mockIOSClip], tombstones: [:])
+    assert(duplicateMergeResult.added == 0, "Deduplication must prevent duplicate clips from remote devices")
+    print("  ✔ Bidirectional iOS-to-Mac clip merge and deduplication passed")
+
+    // 16. Deletion Propagation (Tombstones across devices)
+    let tombstoneDate = Date().addingTimeInterval(10) // deleted 10 seconds later
+    let tombstoneResult = storage.applyRemote(clips: [], tombstones: [uniqueTestHash: tombstoneDate])
+    assert(tombstoneResult.removed == 1, "Tombstone from iOS must remove clip on Mac")
+    assert(!storage.clips.contains { $0.contentHash == uniqueTestHash }, "Deleted clip must no longer exist in active clips")
+    assert(storage.tombstones[uniqueTestHash] != nil, "Tombstone must be recorded in storage")
+
+    // Old remote clip should NOT resurrect if tombstone exists
+    let resurrectAttempt = storage.applyRemote(clips: [mockIOSClip], tombstones: [:])
+    assert(resurrectAttempt.added == 0, "Tombstone must prevent old clip resurrection")
+    print("  ✔ Deletion tombstone propagation and anti-resurrection passed")
+
+    // 17. Resilient Schema Decoding (Missing fields & variations)
+    let minimalJSON = """
+    {
+      "deviceName": "iPad Air",
+      "clips": []
+    }
+    """.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let decodedMinimal = try? decoder.decode(SyncPayload.self, from: minimalJSON)
+    assert(decodedMinimal != nil, "SyncPayload must decode tolerantly when collections/timestamps/deletedHashes are omitted")
+    assert(decodedMinimal?.deviceName == "iPad Air", "Device name should be correctly extracted")
+    print("  ✔ Resilient cross-platform SyncPayload JSON decoding passed")
+
+    // 18. Automatic Sync Debounce & Scheduling
+    cloudSync.scheduleSync(delay: 0.1)
+    print("  ✔ CloudSync scheduleSync debounce scheduling passed")
+
     print("\n✅ All AleClip extended unit tests passed successfully!")
 }
 

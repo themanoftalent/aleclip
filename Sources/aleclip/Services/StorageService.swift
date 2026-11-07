@@ -91,12 +91,20 @@ public final class StorageService: ObservableObject {
         let now = Date()
         for item in items { tombstones[item.contentHash] = now }
         saveTombstones()
+        if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
+            CloudSyncService.shared.scheduleSync()
+        }
     }
 
     private func clearTombstones(for items: [ClipItem]) {
         var changed = false
         for item in items where tombstones.removeValue(forKey: item.contentHash) != nil { changed = true }
-        if changed { saveTombstones() }
+        if changed {
+            saveTombstones()
+            if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
+                CloudSyncService.shared.scheduleSync()
+            }
+        }
     }
 
     private func saveTombstones() {
@@ -194,7 +202,7 @@ public final class StorageService: ObservableObject {
         if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
             CloudSyncService.shared.exportSingleClip(clip)
             if CloudSyncService.shared.syncFrequency == .realTime {
-                CloudSyncService.shared.syncNow()
+                CloudSyncService.shared.scheduleSync()
             }
         }
     }
@@ -355,6 +363,9 @@ public final class StorageService: ObservableObject {
         deletedClips.removeAll()
         undoStack.removeAll()
         saveDeletedHistory()
+        if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
+            CloudSyncService.shared.scheduleSync()
+        }
     }
 
     public func clearUnpinned() {

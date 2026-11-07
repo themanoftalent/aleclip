@@ -192,6 +192,10 @@ public final class FloatingPanelController: ObservableObject {
 
         self.isVisible = true
 
+        if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
+            CloudSyncService.shared.scheduleSync(delay: 0.1)
+        }
+
         startKeyboardMonitoring()
         startDismissMonitoring()
     }

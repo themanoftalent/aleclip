@@ -56,6 +56,20 @@ public struct SyncPayload: Codable, Sendable {
         self.clips = clips
         self.deletedHashes = deletedHashes
     }
+
+    enum CodingKeys: String, CodingKey {
+        case version, deviceName, timestamp, collections, clips, deletedHashes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.version = (try? container.decode(String.self, forKey: .version)) ?? "2.2.0"
+        self.deviceName = (try? container.decode(String.self, forKey: .deviceName)) ?? "Device"
+        self.timestamp = (try? container.decode(Date.self, forKey: .timestamp)) ?? Date()
+        self.collections = (try? container.decode([ClipCollection].self, forKey: .collections)) ?? []
+        self.clips = (try? container.decode([ClipItem].self, forKey: .clips)) ?? []
+        self.deletedHashes = try? container.decodeIfPresent([String: Date].self, forKey: .deletedHashes)
+    }
 }
 
 @MainActor
@@ -86,9 +100,17 @@ public final class CloudSyncService: ObservableObject {
     private let fileManager = FileManager.default
     private let defaults = UserDefaults.standard
 
+    private var syncDebounceWorkItem: DispatchWorkItem?
+    private var periodicSyncTimer: Timer?
+    private var folderMonitorSource: DispatchSourceFileSystemObject?
+    private var monitoredDirectoryDescriptor: CInt = -1
+
     private init() {
         loadSettings()
         checkDetectedAccount()
+        if isConnected {
+            startBackgroundSync()
+        }
     }
 
     public func checkDetectedAccount() {
@@ -161,6 +183,7 @@ public final class CloudSyncService: ObservableObject {
             self.isSyncEnabled = true
             self.syncStatusMessage = "Connected to Google Drive (\(detected.account))"
             saveSettings()
+            startBackgroundSync()
             syncNow()
         } else {
             // Direct Cloud API Mode
@@ -173,11 +196,13 @@ public final class CloudSyncService: ObservableObject {
             self.oauthStatus = "Authorized (Custom OAuth Client)"
             self.syncStatusMessage = "Connected via Google Drive REST API"
             saveSettings()
+            startBackgroundSync()
             syncNow()
         }
     }
 
     public func disconnect() {
+        stopBackgroundSync()
         self.isConnected = false
         self.isSyncEnabled = false
         self.oauthStatus = "Not Authorized"
@@ -267,21 +292,100 @@ public final class CloudSyncService: ObservableObject {
         return url.path
     }
 
-    // MARK: - Sync Operations
+    // MARK: - Sync Operations & Scheduling
 
-    public func syncNow() {
+    /// Debounced automatic sync (delay defaults to 1.5s).
+    public func scheduleSync(delay: TimeInterval = 1.5) {
+        guard isConnected && isSyncEnabled else { return }
+        syncDebounceWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.syncNow(quiet: true)
+            }
+        }
+        syncDebounceWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    /// Background timer + folder monitoring for automatic bidirectional sync.
+    public func startBackgroundSync() {
+        stopBackgroundSync()
+        guard isConnected else { return }
+
+        // Periodic background poll every 15 seconds to pull new clips from other devices (e.g. iOS)
+        periodicSyncTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isConnected, self.isSyncEnabled, !self.isSyncing else { return }
+                self.syncNow(quiet: true)
+            }
+        }
+
+        // Live file system event monitoring on .sync folder
+        setupFolderMonitor()
+    }
+
+    public func stopBackgroundSync() {
+        periodicSyncTimer?.invalidate()
+        periodicSyncTimer = nil
+        stopFolderMonitor()
+    }
+
+    private func setupFolderMonitor() {
+        stopFolderMonitor()
+        guard let syncDir = activeSyncDirectoryURL else { return }
+        let hiddenSyncDir = syncDir.appendingPathComponent(".sync", isDirectory: true)
+        try? fileManager.createDirectory(at: hiddenSyncDir, withIntermediateDirectories: true)
+
+        let fd = open(hiddenSyncDir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        monitoredDirectoryDescriptor = fd
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .attrib, .link],
+            queue: DispatchQueue.main
+        )
+
+        source.setEventHandler { [weak self] in
+            guard let self = self, self.isConnected, self.isSyncEnabled else { return }
+            self.scheduleSync(delay: 0.6)
+        }
+
+        source.setCancelHandler {
+            close(fd)
+        }
+
+        source.resume()
+        folderMonitorSource = source
+    }
+
+    private func stopFolderMonitor() {
+        if let source = folderMonitorSource {
+            source.cancel()
+            folderMonitorSource = nil
+        }
+        monitoredDirectoryDescriptor = -1
+    }
+
+    public func syncNow(quiet: Bool = false) {
         guard isConnected else {
-            self.syncStatusMessage = "Please click 'Connect Google Drive' first."
+            if !quiet {
+                self.syncStatusMessage = "Please click 'Connect Google Drive' first."
+            }
             return
         }
 
         guard let syncDir = activeSyncDirectoryURL else {
-            self.syncStatusMessage = "Sync folder is not accessible"
+            if !quiet {
+                self.syncStatusMessage = "Sync folder is not accessible"
+            }
             return
         }
 
         isSyncing = true
-        self.syncStatusMessage = "Syncing with \(selectedProvider.rawValue)…"
+        if !quiet {
+            self.syncStatusMessage = "Syncing with \(selectedProvider.rawValue)…"
+        }
 
         do {
             try fileManager.createDirectory(at: syncDir, withIntermediateDirectories: true)
@@ -293,7 +397,10 @@ public final class CloudSyncService: ObservableObject {
 
         // Sync data lives in a hidden ".sync" subfolder (Finder hides dot-folders),
         // one file per device (Mac, iPhone, Android). Old visible root files are cleaned up below.
-        let deviceName = Host.current().localizedName ?? "Mac"
+        let rawDeviceName = Host.current().localizedName ?? "Mac"
+        let deviceName = rawDeviceName
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
         let hiddenSyncDir = syncDir.appendingPathComponent(".sync", isDirectory: true)
         let ownFileName = "sync_payload_\(deviceName).json"
         let syncFile = hiddenSyncDir.appendingPathComponent(ownFileName)
@@ -309,7 +416,7 @@ public final class CloudSyncService: ObservableObject {
             let candidates = hiddenFiles + rootFiles.filter { $0.lastPathComponent.hasPrefix("sync_payload_") }
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            for file in candidates where file.pathExtension == "json" && file.lastPathComponent != ownFileName {
+            for file in candidates where file.pathExtension == "json" && file.lastPathComponent != ownFileName && file.lastPathComponent.hasPrefix("sync_payload") {
                 guard let fileData = try? Data(contentsOf: file),
                       let incoming = try? decoder.decode(SyncPayload.self, from: fileData) else { continue }
                 for col in incoming.collections where !StorageService.shared.collections.contains(where: { $0.id == col.id }) {
@@ -356,7 +463,7 @@ public final class CloudSyncService: ObservableObject {
                 self.syncStatusMessage = "✅ Synced to \(providerName) at \(timeStr)"
             }
 
-            if StorageService.shared.settings.soundEffects {
+            if StorageService.shared.settings.soundEffects && incomingMerged > 0 && !quiet {
                 NSSound(named: "Pop")?.play()
             }
         } catch {
@@ -385,6 +492,7 @@ public final class CloudSyncService: ObservableObject {
             self.selectedProvider = .custom
             saveSettings()
             if isConnected {
+                startBackgroundSync()
                 syncNow()
             }
         }
