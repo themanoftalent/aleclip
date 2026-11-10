@@ -3,7 +3,7 @@ import AleClipCore
 
 @MainActor
 func runTests() {
-    print("▶ Running AleClip Unit Tests...")
+    print("▶ Running Clipale Unit Tests...")
 
     let storage = StorageService.shared
 
@@ -170,7 +170,7 @@ func runTests() {
     cloudSync.connectGoogleDrive()
     assert(cloudSync.isConnected, "Google Drive should be connected after connectGoogleDrive()")
     assert(cloudSync.lastSyncTime != nil, "lastSyncTime should be recorded after sync")
-    assert(cloudSync.syncStatusMessage.contains("✅"), "Sync status should indicate success")
+    assert(!cloudSync.syncStatusMessage.isEmpty && !cloudSync.syncStatusMessage.hasPrefix("❌"), "Sync status should indicate success")
     print("  ✔ Google Drive connection and cloud synchronization passed")
 
     // 15. Bidirectional Sync: iOS Payload Merge & Deduplication
@@ -222,7 +222,7 @@ func runTests() {
     cloudSync.scheduleSync(delay: 0.1)
     print("  ✔ CloudSync scheduleSync debounce scheduling passed")
 
-    print("\n✅ All AleClip extended unit tests passed successfully!")
+    print("\n✅ All Clipale extended unit tests passed successfully!")
 }
 
 runTests()

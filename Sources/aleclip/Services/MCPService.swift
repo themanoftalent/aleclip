@@ -34,7 +34,7 @@ public final class MCPService {
             let tools: [[String: Any]] = [
                 [
                     "name": "get_recent_clips",
-                    "description": "Fetch the most recent items from the AleClip clipboard history.",
+                    "description": "Fetch the most recent items from the Clipale clipboard history.",
                     "inputSchema": [
                         "type": "object",
                         "properties": [
@@ -55,7 +55,7 @@ public final class MCPService {
                 ],
                 [
                     "name": "add_clip",
-                    "description": "Add a new text or code snippet to the AleClip clipboard history.",
+                    "description": "Add a new text or code snippet to the Clipale clipboard history.",
                     "inputSchema": [
                         "type": "object",
                         "properties": [
@@ -124,7 +124,7 @@ public final class MCPService {
                 isSensitive: detected.isSensitive
             )
             storage.addClip(item)
-            return "Successfully added clip to AleClip with ID: \(item.id.uuidString)"
+            return "Successfully added clip to Clipale with ID: \(item.id.uuidString)"
 
         case "get_collections":
             let cols = storage.collections

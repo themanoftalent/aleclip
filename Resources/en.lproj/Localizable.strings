@@ -1,4 +1,4 @@
-/* AleClip - English Localization */
+/* Clipale - English Localization */
 
 "panel.searchPlaceholder" = "Search clips...";
 "filter.all" = "All";
@@ -15,7 +15,7 @@
 "toast.restored" = "Clip restored";
 "toast.permanentlyDeleted" = "Clip permanently deleted";
 
-"menu.about" = "About AleClip";
+"menu.about" = "About Clipale";
 "menu.updates" = "Check for Updates…";
 "menu.openPanel" = "Open Clipboard Panel";
 "menu.recentClips" = "Recent Clips";
@@ -23,7 +23,7 @@
 "menu.clearUnpinned" = "Clear Unpinned History";
 "menu.emptyTrash" = "Empty Deleted Clips";
 "menu.settings" = "Settings...";
-"menu.quit" = "Quit AleClip";
+"menu.quit" = "Quit Clipale";
 
 "footer.navigate" = "Navigate";
 "footer.paste" = "Paste";
@@ -40,7 +40,7 @@
 "empty.noMatch" = "No clips match your search.";
 "empty.noDeletedClips" = "Trash is empty. Deleted clips will appear here.";
 
-"about.title" = "About AleClip";
+"about.title" = "About Clipale";
 "about.tagline" = "A modern, lightweight native clipboard manager for macOS.";
 "about.developedBy" = "Developed by SoftAI Yazılım";
 "about.version" = "Version %@ (%@)";
@@ -66,7 +66,7 @@
 "context.delete" = "Delete Clip";
 "context.permanentlyDelete" = "Permanently Delete Clip";
 
-"settings.title" = "AleClip Settings";
+"settings.title" = "Clipale Settings";
 "settings.tab.general" = "General";
 "settings.tab.shortcuts" = "Shortcuts";
 "settings.tab.exclusions" = "Exclusions";
@@ -84,7 +84,7 @@
 "settings.general.pasteDirectly" = "Paste directly into active application upon selection";
 "settings.general.accessGranted" = "Accessibility Permission Granted";
 "settings.general.accessRequired" = "Accessibility Permission Required";
-"settings.general.accessGrantedDesc" = "AleClip can synthesize ⌘V directly into your active apps.";
+"settings.general.accessGrantedDesc" = "Clipale can synthesize ⌘V directly into your active apps.";
 "settings.general.accessRequiredDesc" = "macOS requires Accessibility access to simulate paste keystrokes.";
 "settings.general.openSysSettings" = "Open System Settings";
 "settings.general.plainTextAlways" = "Always paste as unformatted plain text (strip rich text & HTML styling)";
@@ -92,19 +92,19 @@
 "settings.general.soundEffects" = "Play sound feedback when copying or pasting clips";
 
 "settings.general.startup" = "System Startup";
-"settings.general.launchAtLogin" = "Launch AleClip automatically when the computer starts";
-"settings.general.launchAtLoginHelp" = "Starts AleClip silently in the menu bar whenever you log into macOS.";
+"settings.general.launchAtLogin" = "Launch Clipale automatically when the computer starts";
+"settings.general.launchAtLoginHelp" = "Starts Clipale silently in the menu bar whenever you log into macOS.";
 
 "settings.alert.langRestartTitle" = "Language Changed";
-"settings.alert.langRestartMsg" = "Restart AleClip to apply the new language.";
+"settings.alert.langRestartMsg" = "Restart Clipale to apply the new language.";
 "settings.alert.restartNow" = "Restart Now";
 "settings.alert.later" = "Later";
 
 "settings.shortcuts.globalTitle" = "Global Activation Shortcut";
-"settings.shortcuts.globalDesc" = "Shortcut to open/close AleClip:";
+"settings.shortcuts.globalDesc" = "Shortcut to open/close Clipale:";
 "settings.shortcuts.globalHelp" = "Pressing this global shortcut from any app brings up the non-activating bottom panel without stealing window focus.";
 "settings.shortcuts.guideTitle" = "In-Panel Keyboard Shortcuts";
-"settings.shortcuts.togglePanel" = "Open / Dismiss AleClip bottom panel";
+"settings.shortcuts.togglePanel" = "Open / Dismiss Clipale bottom panel";
 "settings.shortcuts.navigateCards" = "Navigate between clipboard cards";
 "settings.shortcuts.pasteClip" = "Paste selected clip into frontmost app";
 "settings.shortcuts.quickPaste" = "Quick paste card 1 to 9 directly";

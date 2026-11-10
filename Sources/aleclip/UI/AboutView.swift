@@ -191,7 +191,7 @@ public struct AboutView: View {
                 }
 
                 VStack(spacing: 3) {
-                    Text("AleClip")
+                    Text("Clipale")
                         .font(.system(size: 20, weight: .bold))
                     Text(versionString)
                         .font(.system(size: 11))

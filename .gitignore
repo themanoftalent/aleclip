@@ -14,3 +14,5 @@ rarreg.key
 local.properties
 *.bak
 .DS_Store
+*.app/
+*.dmg

@@ -125,7 +125,7 @@ public struct SettingsView: View {
             switch item {
             case .info(let message):
                 return Alert(
-                    title: Text("AleClip"),
+                    title: Text("Clipale"),
                     message: Text(message),
                     dismissButton: .default(Text("OK"))
                 )
@@ -346,12 +346,20 @@ public struct SettingsView: View {
                             .font(.system(size: 13))
                         Spacer()
                         Picker("", selection: $seqQueue.isFIFO) {
-                            Text("First-In First-Out (FIFO)").tag(true)
-                            Text("Last-In First-Out (LIFO)").tag(false)
+                            Text("FIFO").tag(true)
+                            Text("LIFO").tag(false)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 250)
+                        .labelsHidden()
+                        .frame(width: 180)
+                        .accessibilityLabel("Queue order")
                     }
+                    Text(seqQueue.isFIFO
+                         ? "First in, first out: paste the oldest queued item first."
+                         : "Last in, first out: paste the newest queued item first.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if !seqQueue.queue.isEmpty {
                         HStack {
@@ -372,11 +380,23 @@ public struct SettingsView: View {
 
     // MARK: - AI & MCP Content
 
+    // Resolve the installed executable rather than assuming /Applications.
+    // Keep the existing MCP server key and executable identity for compatibility.
+    private var mcpConfiguration: String {
+        let command = Bundle.main.executableURL?.path ?? "/Applications/Clipale.app/Contents/MacOS/aleclip"
+        let configuration: [String: Any] = [
+            "mcpServers": ["aleclip": ["command": command, "args": ["--mcp"]]]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+              let json = String(data: data, encoding: .utf8) else { return "" }
+        return json
+    }
+
     private var mcpContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             settingsCard(title: "Model Context Protocol (MCP) Integration", icon: "sparkles") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("AleClip includes native Model Context Protocol (MCP) server support, allowing AI assistants in Claude Desktop, Cursor, VS Code, and Codex to access clipboard history, perform OCR search, and insert clips.")
+                    Text("Clipale includes native Model Context Protocol (MCP) server support, allowing AI assistants in Claude Desktop, Cursor, VS Code, and Codex to access clipboard history, perform OCR search, and insert clips.")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
 
@@ -385,20 +405,7 @@ public struct SettingsView: View {
                     Text("How to Connect with Claude Desktop & Cursor:")
                         .font(.caption.bold())
 
-                    Text("""
-Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "aleclip": {
-      "command": "/Applications/AleClip.app/Contents/MacOS/aleclip",
-      "args": ["--mcp"]
-    }
-  }
-}
-```
-""")
+                    Text("Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:\n\n" + mcpConfiguration)
                     .font(.system(size: 11, design: .monospaced))
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
@@ -665,13 +672,13 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
                         .buttonStyle(.bordered)
                         .disabled(!cloudSync.isConnected)
 
-                        Spacer()
-
-                        Text(cloudSync.syncStatusMessage)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(cloudSync.syncStatusMessage.contains("failed") ? .red : .secondary)
-                            .lineLimit(1)
+                        Spacer(minLength: 0)
                     }
+                    Text(cloudSync.syncStatusMessage)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(cloudSync.syncStatusMessage.localizedCaseInsensitiveContains("failed") ? .red : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
@@ -823,7 +830,7 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
 
                     Divider()
 
-                    Text("Automatic Recovery: In the unlikely event of system corruption or crash, AleClip automatically preserves previous history files with timestamped `.bak` archives and restores active history safely.")
+                    Text("Automatic Recovery: In the unlikely event of system corruption or crash, Clipale automatically preserves previous history files with timestamped `.bak` archives and restores active history safely.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -845,7 +852,7 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
 
             settingsCard(title: "Trash & Deleted Items Recovery", icon: "arrow.counterclockwise.circle.fill") {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("AleClip preserves deleted clips in a safe local Trash bin so you can recover any accidentally deleted notes, codes, or images.")
+                    Text("Clipale preserves deleted clips in a safe local Trash bin so you can recover any accidentally deleted notes, codes, or images.")
                         .font(.caption)
                         .foregroundColor(.secondary)
 
@@ -877,7 +884,7 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
     private func exportHistory() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "AleClip-Backup-\(ISO8601DateFormatter().string(from: Date())).json"
+        panel.nameFieldStringValue = "Clipale-Backup-\(ISO8601DateFormatter().string(from: Date())).json"
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try storage.exportJSON(to: url)
@@ -921,7 +928,7 @@ Add this entry to your `claude_desktop_config.json` or Cursor MCP settings:
             }
 
             VStack(spacing: 3) {
-                Text("AleClip")
+                Text("Clipale")
                     .font(.system(size: 20, weight: .bold))
                 Text(locF("about.version", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1.0", Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "2026"))
                     .font(.caption)

@@ -89,7 +89,11 @@ public final class StorageService: ObservableObject {
     private func recordTombstones(for items: [ClipItem]) {
         guard !items.isEmpty else { return }
         let now = Date()
-        for item in items { tombstones[item.contentHash] = now }
+        for item in items {
+            // Restores use a whole-second revision so ISO8601 legacy readers preserve it.
+            // A subsequent deletion must not predate that revision.
+            tombstones[item.contentHash] = max(now, item.lastUsedAt, tombstones[item.contentHash] ?? .distantPast)
+        }
         saveTombstones()
         if CloudSyncService.shared.isConnected && CloudSyncService.shared.isSyncEnabled {
             CloudSyncService.shared.scheduleSync()
@@ -127,33 +131,52 @@ public final class StorageService: ObservableObject {
     /// Merges another device's clips and deletions. Never triggers a sync itself.
     @discardableResult
     public func applyRemote(clips remoteClips: [ClipItem], tombstones remoteTombstones: [String: Date]) -> (added: Int, removed: Int) {
-        var removed: [ClipItem] = []
         var tombstonesChanged = false
         for (hash, deletedAt) in remoteTombstones {
             if let existing = tombstones[hash], existing >= deletedAt { continue }
             tombstones[hash] = deletedAt
             tombstonesChanged = true
-            removed += clips.filter { $0.contentHash == hash && $0.lastUsedAt <= deletedAt && !$0.isPinned }
+        }
+
+        var localHashes = Set(clips.map(\.contentHash))
+        var pinsChanged = false
+        var added = 0
+        for clip in remoteClips {
+            if let index = clips.firstIndex(where: { $0.contentHash == clip.contentHash }) {
+                // Never replace the local model: another platform may omit its rich metadata.
+                // Legacy payloads have no revision and cannot undo an explicit pin change.
+                if let revision = clip.pinModifiedAt, revision.isFinite,
+                   revision > (clips[index].pinModifiedAt ?? 0) ||
+                    (revision == clips[index].pinModifiedAt && clip.isPinned && !clips[index].isPinned) {
+                    clips[index].isPinned = clip.isPinned
+                    clips[index].pinModifiedAt = revision
+                    pinsChanged = true
+                }
+                continue
+            }
+            guard !localHashes.contains(clip.contentHash) else { continue }
+            if let deletedAt = tombstones[clip.contentHash], deletedAt >= clip.lastUsedAt { continue }
+            clips.append(clip)
+            localHashes.insert(clip.contentHash)
+            added += 1
+        }
+        // Reevaluate retained tombstones after pin changes. A deletion received while
+        // pinned must still apply once a newer remote unpin arrives, in either order.
+        let removed = clips.filter { clip in
+            guard !clip.isPinned, let deletedAt = tombstones[clip.contentHash] else { return false }
+            return clip.lastUsedAt <= deletedAt
         }
         if !removed.isEmpty {
             let ids = Set(removed.map(\.id))
             clips.removeAll { ids.contains($0.id) }
             deletedClips.removeAll { ids.contains($0.id) }
             deletedClips.insert(contentsOf: removed, at: 0)
-            if deletedClips.count > 100 { deletedClips = Array(deletedClips.prefix(100)) }
-        }
-
-        let localHashes = Set(clips.map(\.contentHash))
-        var added = 0
-        for clip in remoteClips where !localHashes.contains(clip.contentHash) {
-            if let deletedAt = tombstones[clip.contentHash], deletedAt >= clip.lastUsedAt { continue }
-            clips.append(clip)
-            added += 1
+            // Sync never purges recoverable history to enforce a trash size cap.
         }
         if added > 0 { clips.sort { $0.createdAt > $1.createdAt } }
 
         if tombstonesChanged { saveTombstones() }
-        if added > 0 || !removed.isEmpty {
+        if added > 0 || !removed.isEmpty || pinsChanged {
             saveHistory()
             saveDeletedHistory()
         }
@@ -175,6 +198,7 @@ public final class StorageService: ObservableObject {
         let workItem = DispatchWorkItem { [weak self] in
             Task { @MainActor [weak self] in
                 self?.saveHistory()
+                CloudSyncService.shared.scheduleSync()
             }
         }
         saveDebounceWorkItem = workItem
@@ -209,13 +233,18 @@ public final class StorageService: ObservableObject {
 
     public func updateClip(_ clip: ClipItem) {
         guard let index = clips.firstIndex(where: { $0.id == clip.id }) else { return }
-        clips[index] = clip
+        var changed = clip
+        if clips[index].isPinned != clip.isPinned {
+            changed.pinModifiedAt = Date().timeIntervalSince1970
+        }
+        clips[index] = changed
         scheduleSaveHistory()
     }
 
     public func togglePin(for clipId: UUID) {
         guard let index = clips.firstIndex(where: { $0.id == clipId }) else { return }
         clips[index].isPinned.toggle()
+        clips[index].pinModifiedAt = Date().timeIntervalSince1970
         scheduleSaveHistory()
     }
 
@@ -311,7 +340,8 @@ public final class StorageService: ObservableObject {
     @discardableResult
     public func restoreClip(id: UUID) -> ClipItem? {
         guard let index = deletedClips.firstIndex(where: { $0.id == id }) else { return nil }
-        let restored = deletedClips.remove(at: index)
+        var restored = deletedClips.remove(at: index)
+        restored.lastUsedAt = Date(timeIntervalSince1970: max(ceil(Date().timeIntervalSince1970), floor(tombstones[restored.contentHash]?.timeIntervalSince1970 ?? 0) + 1))
         clearTombstones(for: [restored])
         undoStack.removeAll { $0.clip.id == id }
 
@@ -327,8 +357,10 @@ public final class StorageService: ObservableObject {
     public func restoreAllDeleted() -> Int {
         guard !deletedClips.isEmpty else { return 0 }
         let count = deletedClips.count
+        let restoreRevision = max(ceil(Date().timeIntervalSince1970), floor(tombstones.values.map(\.timeIntervalSince1970).max() ?? 0) + 1)
         clearTombstones(for: deletedClips)
-        for item in deletedClips.reversed() {
+        for var item in deletedClips.reversed() {
+            item.lastUsedAt = Date(timeIntervalSince1970: restoreRevision)
             clips.removeAll { $0.id == item.id }
             clips.insert(item, at: 0)
         }
@@ -343,7 +375,8 @@ public final class StorageService: ObservableObject {
     @discardableResult
     public func undoLastDelete() -> ClipItem? {
         guard let last = undoStack.popLast() else { return nil }
-        let clip = last.clip
+        var clip = last.clip
+        clip.lastUsedAt = Date(timeIntervalSince1970: max(ceil(Date().timeIntervalSince1970), floor(tombstones[clip.contentHash]?.timeIntervalSince1970 ?? 0) + 1))
         clearTombstones(for: [clip])
         let targetIndex = min(last.originalIndex, clips.count)
 

@@ -53,6 +53,8 @@ public struct ClipItem: Identifiable, Codable, Sendable, Equatable {
     public var createdAt: Date
     public var lastUsedAt: Date
     public var isPinned: Bool
+    /// Seconds since 1970; independent of capture/use times and backwards compatible.
+    public var pinModifiedAt: Double? = nil
     public var contentHash: String
 
     // New Extended Attributes
@@ -107,6 +109,7 @@ public struct ClipItem: Identifiable, Codable, Sendable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case pinModifiedAt
         case id, type, plainText, htmlContent, rtfData, imageFileName, url, colorHex
         case title, sourceAppBundleId, sourceAppName, createdAt, lastUsedAt, isPinned, contentHash
         case ocrText, detectedLanguage, isSensitive, collectionId, sourceDevice
@@ -128,6 +131,7 @@ public struct ClipItem: Identifiable, Codable, Sendable, Equatable {
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         self.lastUsedAt = try container.decodeIfPresent(Date.self, forKey: .lastUsedAt) ?? Date()
         self.isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        self.pinModifiedAt = try? container.decodeIfPresent(Double.self, forKey: .pinModifiedAt)
         self.contentHash = try container.decodeIfPresent(String.self, forKey: .contentHash) ?? UUID().uuidString
         self.ocrText = try container.decodeIfPresent(String.self, forKey: .ocrText)
         self.detectedLanguage = try container.decodeIfPresent(String.self, forKey: .detectedLanguage)
@@ -182,5 +186,18 @@ public struct ClipItem: Identifiable, Codable, Sendable, Equatable {
         if let appName = sourceAppName, appName.localizedStandardContains(trimmed) { return true }
         if let dev = sourceDevice, dev.localizedStandardContains(trimmed) { return true }
         return false
+    }
+}
+
+/// Compare sync state independently of JSON key order and the transport timestamp.
+/// A timestamp-only rewrite triggers our folder watcher and restarts cloud uploads.
+public enum SyncSnapshot {
+    public static func hasSameContent(_ lhs: Data, _ rhs: Data) -> Bool {
+        guard var left = (try? JSONSerialization.jsonObject(with: lhs)) as? [String: Any],
+              var right = (try? JSONSerialization.jsonObject(with: rhs)) as? [String: Any],
+              left["clips"] is [Any], right["clips"] is [Any] else { return false }
+        left.removeValue(forKey: "timestamp")
+        right.removeValue(forKey: "timestamp")
+        return NSDictionary(dictionary: left).isEqual(to: right)
     }
 }

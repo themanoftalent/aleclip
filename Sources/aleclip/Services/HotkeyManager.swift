@@ -81,7 +81,7 @@ public final class HotkeyManager: ObservableObject {
         registerSingleHotkey(keyCode: UInt32(kVK_ANSI_V), modifiers: UInt32(optionKey), id: 1)
 
         // Only ⌥V plus the shortcut chosen in Settings are registered.
-        // (No hardcoded ⇧⌘V: AleClip must not respond to shortcuts the user didn't configure.)
+        // (No hardcoded ⇧⌘V: Clipale must not respond to shortcuts the user didn't configure.)
 
         // Also register any custom option selected in Settings if different
         let saved = StorageService.shared.settings.selectedShortcut

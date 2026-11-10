@@ -62,7 +62,7 @@ public struct ClipboardBarView: View {
                     .padding(.top, 8)
                     .padding(.horizontal, 24)
 
-                // MARK: - Row 2: AleClip Content Type Filters & App/Date Filters
+                // MARK: - Row 2: Clipale Content Type Filters & App/Date Filters
                 filterSubHeaderBar
                     .padding(.horizontal, 24)
 
@@ -324,7 +324,7 @@ public struct ClipboardBarView: View {
                             type: detected.detectedType,
                             plainText: content,
                             title: title.isEmpty ? nil : title,
-                            sourceAppName: "AleClip",
+                            sourceAppName: "Clipale",
                             contentHash: UUID().uuidString,
                             detectedLanguage: detected.detectedLanguage,
                             isSensitive: detected.isSensitive,
@@ -547,7 +547,7 @@ public struct ClipboardBarView: View {
         }
     }
 
-    // MARK: - Row 2: Content Type Filters & Metadata Filters (AleClip Features)
+    // MARK: - Row 2: Content Type Filters & Metadata Filters (Clipale Features)
 
     private var filterSubHeaderBar: some View {
         HStack(spacing: 8) {

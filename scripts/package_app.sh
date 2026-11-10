@@ -2,7 +2,15 @@
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="AleClip"
+# Build-only validation never stops, replaces, or launches an installed app.
+INSTALL_APP=true
+case "${1:-}" in
+    --no-install) INSTALL_APP=false ;;
+    "") ;;
+    *) echo "Usage: $0 [--no-install]" >&2; exit 2 ;;
+esac
+cd "${DIR}"
+APP_NAME="Clipale"
 APP_BUNDLE="${DIR}/${APP_NAME}.app"
 CONTENTS="${APP_BUNDLE}/Contents"
 MACOS="${CONTENTS}/MacOS"
@@ -44,15 +52,15 @@ cat <<EOF > "${CONTENTS}/Info.plist"
     <key>CFBundleIdentifier</key>
     <string>com.darwin.aleclip</string>
     <key>CFBundleName</key>
-    <string>AleClip</string>
+    <string>Clipale</string>
     <key>CFBundleDisplayName</key>
-    <string>AleClip</string>
+    <string>Clipale</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>2.2.0</string>
     <key>CFBundleVersion</key>
-    <string>2026</string>
+    <string>2037</string>
     <key>NSHumanReadableCopyright</key>
     <string>© 2026 SoftAI Yazılım</string>
     <key>CFBundleDevelopmentRegion</key>
@@ -74,7 +82,7 @@ cat <<EOF > "${CONTENTS}/Info.plist"
         </dict>
     </array>
     <key>NSAccessibilityUsageDescription</key>
-    <string>AleClip needs Accessibility access to synthesize paste keystrokes into your active applications.</string>
+    <string>Clipale needs Accessibility access to synthesize paste keystrokes into your active applications.</string>
     <key>SUEnableAutomaticChecks</key>
     <false/>
     <key>CFBundleIconFile</key>
@@ -126,15 +134,23 @@ rm -rf "${STAGING_DIR}"
 xattr -cr "${DMG_PATH}"
 echo "✅ Successfully built DMG at ${DMG_PATH}!"
 
-# Update /Applications/AleClip.app
+if [ "${INSTALL_APP}" = false ]; then
+    echo "✅ Build-only packaging complete; installed apps were not changed."
+    exit 0
+fi
+
+# Update /Applications/Clipale.app
 echo "🚀 Updating /Applications/${APP_NAME}.app..."
 pkill -x aleclip 2>/dev/null || true
+pkill -x Clipale 2>/dev/null || true
 sleep 0.8
+rm -rf "/Applications/AleClip.app"
 rm -rf "/Applications/${APP_NAME}.app"
 cp -R "${APP_BUNDLE}" "/Applications/${APP_NAME}.app"
 xattr -cr "/Applications/${APP_NAME}.app"
 touch "/Applications/${APP_NAME}.app"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/${APP_NAME}.app" 2>/dev/null || true
 
 # Relaunch
 open "/Applications/${APP_NAME}.app"
-echo "🎉 AleClip is now running with the new App Icon!"
+echo "🎉 Clipale is now running with the new App Icon!"

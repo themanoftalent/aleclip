@@ -67,7 +67,7 @@ public struct SyncPayload: Codable, Sendable {
         self.deviceName = (try? container.decode(String.self, forKey: .deviceName)) ?? "Device"
         self.timestamp = (try? container.decode(Date.self, forKey: .timestamp)) ?? Date()
         self.collections = (try? container.decode([ClipCollection].self, forKey: .collections)) ?? []
-        self.clips = (try? container.decode([ClipItem].self, forKey: .clips)) ?? []
+        self.clips = try container.decode([ClipItem].self, forKey: .clips)
         self.deletedHashes = try? container.decodeIfPresent([String: Date].self, forKey: .deletedHashes)
     }
 }
@@ -225,7 +225,14 @@ public final class CloudSyncService: ObservableObject {
         // 1. Check ~/Library/CloudStorage/
         let cloudStorageURL = home.appendingPathComponent("Library/CloudStorage", isDirectory: true)
         if let contents = try? fileManager.contentsOfDirectory(at: cloudStorageURL, includingPropertiesForKeys: nil) {
-            for folder in contents {
+            let sorted = contents.sorted { left, right in
+                let suffix = "My Drive/AleClip/.sync"
+                let leftHasSync = fileManager.fileExists(atPath: left.appendingPathComponent(suffix).path)
+                let rightHasSync = fileManager.fileExists(atPath: right.appendingPathComponent(suffix).path)
+                if leftHasSync != rightHasSync { return leftHasSync }
+                return left.lastPathComponent < right.lastPathComponent
+            }
+            for folder in sorted {
                 let name = folder.lastPathComponent
                 if name.hasPrefix("GoogleDrive-") || name.hasPrefix("GoogleDrive‑") {
                     let account = name
@@ -368,6 +375,7 @@ public final class CloudSyncService: ObservableObject {
     }
 
     public func syncNow(quiet: Bool = false) {
+        guard !isSyncing else { return }
         guard isConnected else {
             if !quiet {
                 self.syncStatusMessage = "Please click 'Connect Google Drive' first."
@@ -411,14 +419,16 @@ public final class CloudSyncService: ObservableObject {
             // 1. Merge other devices first (clips + deletions), so our payload includes them.
             //    applyRemote never triggers another sync (no recursion).
             var incomingMerged = 0
-            let hiddenFiles = (try? fileManager.contentsOfDirectory(at: hiddenSyncDir, includingPropertiesForKeys: nil)) ?? []
-            let rootFiles = (try? fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil)) ?? []
+            var incomingDevices = 0
+            let hiddenFiles = try fileManager.contentsOfDirectory(at: hiddenSyncDir, includingPropertiesForKeys: nil)
+            let rootFiles = try fileManager.contentsOfDirectory(at: syncDir, includingPropertiesForKeys: nil)
             let candidates = hiddenFiles + rootFiles.filter { $0.lastPathComponent.hasPrefix("sync_payload_") }
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             for file in candidates where file.pathExtension == "json" && file.lastPathComponent != ownFileName && file.lastPathComponent.hasPrefix("sync_payload") {
-                guard let fileData = try? Data(contentsOf: file),
-                      let incoming = try? decoder.decode(SyncPayload.self, from: fileData) else { continue }
+                let fileData = try Data(contentsOf: file)
+                let incoming = try decoder.decode(SyncPayload.self, from: fileData)
+                incomingDevices += 1
                 for col in incoming.collections where !StorageService.shared.collections.contains(where: { $0.id == col.id }) {
                     StorageService.shared.addCollection(col)
                 }
@@ -444,12 +454,15 @@ public final class CloudSyncService: ObservableObject {
             encoder.outputFormatting = .prettyPrinted
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(localPayload)
-            try data.write(to: syncFile, options: .atomic)
-
-            // Remove this Mac's legacy visible copies (and the redundant generic duplicate).
-            for legacy in [ownFileName, "sync_payload.json"] {
-                try? fileManager.removeItem(at: syncDir.appendingPathComponent(legacy))
+            // Read peers on every poll, but only publish an actual state change.
+            // This also terminates the notification caused by our own atomic write.
+            if let previous = try? Data(contentsOf: syncFile), SyncSnapshot.hasSameContent(previous, data) {
+                // Keep the original file and its completed cloud-upload state.
+            } else {
+                try data.write(to: syncFile, options: .atomic)
             }
+
+            // Preserve legacy payloads: deleting them can discard another installation's data.
 
             // 3. Export each clip as a standalone .txt (and .png if image) into the week folders.
             exportClipsAsTextFiles(clipsToSync, to: syncDir)
@@ -457,10 +470,10 @@ public final class CloudSyncService: ObservableObject {
             self.lastSyncTime = Date()
             let timeStr = Date().formatted(date: .omitted, time: .standard)
             let providerName = selectedProvider.rawValue
-            if incomingMerged > 0 {
-                self.syncStatusMessage = "✅ Synced to \(providerName) at \(timeStr) (Merged \(incomingMerged) items)"
+            if incomingDevices == 0 {
+                self.syncStatusMessage = "Saved \(clipsToSync.count) clips to the sync folder at \(timeStr). No other device file found yet. On iPhone, open Clipale → Settings → Sync with Mac and check the selected folder and status."
             } else {
-                self.syncStatusMessage = "✅ Synced to \(providerName) at \(timeStr)"
+                self.syncStatusMessage = "Saved to \(providerName) at \(timeStr); read \(incomingDevices) other device file(s), merged \(incomingMerged) item(s). Cloud upload timing is managed by your provider."
             }
 
             if StorageService.shared.settings.soundEffects && incomingMerged > 0 && !quiet {

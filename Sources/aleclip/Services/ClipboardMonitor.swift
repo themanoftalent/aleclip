@@ -52,7 +52,7 @@ public final class ClipboardMonitor: ObservableObject {
         guard currentChangeCount != lastChangeCount else { return }
         lastChangeCount = currentChangeCount
 
-        // If this copy was initiated by AleClip itself, skip recording
+        // If this copy was initiated by Clipale itself, skip recording
         if isInternalCopy {
             isInternalCopy = false
             return

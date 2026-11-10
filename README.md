@@ -1,7 +1,7 @@
-# AleClip 📋
+# Clipale 📋
 
 <p align="center">
-  <img src="Resources/AppIcon_1024.png" width="128" height="128" alt="AleClip Logo" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);" />
+  <img src="Resources/AppIcon_1024.png" width="128" height="128" alt="Clipale Logo" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);" />
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 ## 🛡️ Privacy & Philosophy
 
-- **Zero Data Collection**: AleClip contains **no telemetry, no analytics, no remote tracking, and no external data selling**.
+- **Zero Data Collection**: Clipale contains **no telemetry, no analytics, no remote tracking, and no external data selling**.
 - **100% Local & Encrypted Storage**: All clipboard clips, collections, and settings are saved locally (`~/Library/Application Support/AleClip/`).
 - **Screen-Sharing Privacy Shield**: Automatically conceals and blurs clipboard content during screen sharing, recordings, or presentations.
 - **Sensitive Data Protection**: Automatically detects, masks, and protects secret tokens, API keys (`sk-`, `ghp_`, `AKIA`), credit cards, and password manager transient pasteboards.
@@ -88,7 +88,7 @@
 
 ## 🤖 Model Context Protocol (MCP) Integration
 
-AleClip can run as a native MCP server over `stdio` to provide AI tools with real-time access to your clipboard and OCR index.
+Clipale can run as a native MCP server over `stdio` to provide AI tools with real-time access to your clipboard and OCR index.
 
 To configure Claude Desktop or Cursor, add the following to your configuration:
 
@@ -96,7 +96,7 @@ To configure Claude Desktop or Cursor, add the following to your configuration:
 {
   "mcpServers": {
     "aleclip": {
-      "command": "/Applications/AleClip.app/Contents/MacOS/aleclip",
+      "command": "/Applications/Clipale.app/Contents/MacOS/aleclip",
       "args": ["--mcp"]
     }
   }
@@ -138,8 +138,8 @@ swift run test-runner
 ```
 
 The output files will be created at:
-- `AleClip.app` (Installed to `/Applications/AleClip.app`)
-- `AleClip.dmg` (Distribution disk image)
+- `Clipale.app` (Installed to `/Applications/Clipale.app`)
+- `Clipale.dmg` (Distribution disk image)
 
 ---
 
@@ -147,3 +147,9 @@ The output files will be created at:
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.  
 Created and maintained by SoftAI Yazılım (Mehmet Akif Çifçi).
+
+### Branding and compatibility
+
+The app is now **Clipale**. Existing data remains in `~/Library/Application Support/AleClip/`, and existing sync folders, preferences, bundle identifier, `aleclip://` links, MCP identifiers, and `.aleclipcollection` files remain compatible. The Swift module and executable retain their existing technical names.
+
+For build-only packaging without stopping, replacing, or launching an installed app, use `bash scripts/package_app.sh --no-install`. The default packaging command still installs and launches the generated app.

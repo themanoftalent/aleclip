@@ -1,4 +1,4 @@
-/* AleClip - Türkçe Yerelleştirme */
+/* Clipale - Türkçe Yerelleştirme */
 
 "panel.searchPlaceholder" = "Panoda ara...";
 "filter.all" = "Tümü";
@@ -15,7 +15,7 @@
 "toast.restored" = "Kayıt geri yüklendi";
 "toast.permanentlyDeleted" = "Kayıt kalıcı olarak silindi";
 
-"menu.about" = "AleClip Hakkında";
+"menu.about" = "Clipale Hakkında";
 "menu.updates" = "Güncellemeleri Denetle…";
 "menu.openPanel" = "Pano Panelini Aç";
 "menu.recentClips" = "Son Kopyalananlar";
@@ -23,7 +23,7 @@
 "menu.clearUnpinned" = "Sabitlenmemiş Geçmişi Temizle";
 "menu.emptyTrash" = "Silinenleri Tamamen Temizle";
 "menu.settings" = "Ayarlar…";
-"menu.quit" = "AleClip'ten Çık";
+"menu.quit" = "Clipale'ten Çık";
 
 "footer.navigate" = "Gezin";
 "footer.paste" = "Yapıştır";
@@ -40,7 +40,7 @@
 "empty.noMatch" = "Aramanla eşleşen kayıt yok.";
 "empty.noDeletedClips" = "Çöp kutusu boş. Silinen kayıtlar burada görünür.";
 
-"about.title" = "AleClip Hakkında";
+"about.title" = "Clipale Hakkında";
 "about.tagline" = "macOS için modern, hafif ve yerel bir pano yöneticisi.";
 "about.developedBy" = "SoftAI Yazılım tarafından geliştirildi";
 "about.version" = "Sürüm %@ (%@)";
@@ -66,7 +66,7 @@
 "context.delete" = "Kaydı Sil";
 "context.permanentlyDelete" = "Kaydı Kalıcı Olarak Sil";
 
-"settings.title" = "AleClip Ayarları";
+"settings.title" = "Clipale Ayarları";
 "settings.tab.general" = "Genel";
 "settings.tab.shortcuts" = "Kısayollar";
 "settings.tab.exclusions" = "Dışlananlar";
@@ -84,7 +84,7 @@
 "settings.general.pasteDirectly" = "Seçildiğinde doğrudan aktif uygulamaya yapıştır";
 "settings.general.accessGranted" = "Erişilebilirlik İzni Verildi";
 "settings.general.accessRequired" = "Erişilebilirlik İzni Gerekli";
-"settings.general.accessGrantedDesc" = "AleClip doğrudan aktif uygulamalarınıza ⌘V yapıştırma komutu gönderebilir.";
+"settings.general.accessGrantedDesc" = "Clipale doğrudan aktif uygulamalarınıza ⌘V yapıştırma komutu gönderebilir.";
 "settings.general.accessRequiredDesc" = "macOS yapıştırma tuş vuruşlarını simüle etmek için Erişilebilirlik izni gerektirir.";
 "settings.general.openSysSettings" = "Sistem Ayarlarını Aç";
 "settings.general.plainTextAlways" = "Her zaman biçimlendirilmemiş düz metin olarak yapıştır (zengin metin ve HTML stillerini temizle)";
@@ -92,19 +92,19 @@
 "settings.general.soundEffects" = "Kayıt kopyalandığında veya yapıştırıldığında ses çal";
 
 "settings.general.startup" = "Sistem Başlangıcı";
-"settings.general.launchAtLogin" = "Bilgisayar açıldığında AleClip'i otomatik başlat";
-"settings.general.launchAtLoginHelp" = "macOS'a giriş yaptığınızda AleClip menü çubuğunda sessizce hazır başlar.";
+"settings.general.launchAtLogin" = "Bilgisayar açıldığında Clipale'i otomatik başlat";
+"settings.general.launchAtLoginHelp" = "macOS'a giriş yaptığınızda Clipale menü çubuğunda sessizce hazır başlar.";
 
 "settings.alert.langRestartTitle" = "Dil Değiştirildi";
-"settings.alert.langRestartMsg" = "Yeni dilin uygulanması için AleClip'i yeniden başlatın.";
+"settings.alert.langRestartMsg" = "Yeni dilin uygulanması için Clipale'i yeniden başlatın.";
 "settings.alert.restartNow" = "Şimdi Yeniden Başlat";
 "settings.alert.later" = "Daha Sonra";
 
 "settings.shortcuts.globalTitle" = "Genel Etkinleştirme Kısayolu";
-"settings.shortcuts.globalDesc" = "AleClip'i açma/kapatma kısayolu:";
+"settings.shortcuts.globalDesc" = "Clipale'i açma/kapatma kısayolu:";
 "settings.shortcuts.globalHelp" = "Herhangi bir uygulamadayken bu genel kısayola basıldığında, pencere odağını kaybetmeden alt panel açılır.";
 "settings.shortcuts.guideTitle" = "Panel İçi Klavye Kısayolları";
-"settings.shortcuts.togglePanel" = "AleClip alt panelini Aç / Kapat";
+"settings.shortcuts.togglePanel" = "Clipale alt panelini Aç / Kapat";
 "settings.shortcuts.navigateCards" = "Pano kartları arasında gezin";
 "settings.shortcuts.pasteClip" = "Seçilen kaydı ön plandaki uygulamaya yapıştır";
 "settings.shortcuts.quickPaste" = "1'den 9'a kadar olan kartı doğrudan yapıştır";

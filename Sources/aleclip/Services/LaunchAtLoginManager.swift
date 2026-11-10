@@ -28,7 +28,7 @@ public final class LaunchAtLoginManager: @unchecked Sendable {
                     }
                 }
             } catch {
-                NSLog("[AleClip] SMAppService registration note: \(error.localizedDescription). Using login item fallback.")
+                NSLog("[Clipale] SMAppService registration note: \(error.localizedDescription). Using login item fallback.")
                 setLoginItemViaAppleScript(enable)
             }
         } else {
@@ -43,7 +43,7 @@ public final class LaunchAtLoginManager: @unchecked Sendable {
     }
 
     private func isLoginItemConfiguredViaAppleScript() -> Bool {
-        let script = "tell application \"System Events\" to return (exists login item \"AleClip\")"
+        let script = "tell application \"System Events\" to return ((exists login item \"Clipale\") or (exists login item \"AleClip\"))"
         var error: NSDictionary?
         if let appleScript = NSAppleScript(source: script) {
             let result = appleScript.executeAndReturnError(&error)
@@ -58,14 +58,20 @@ public final class LaunchAtLoginManager: @unchecked Sendable {
         if enable {
             script = """
             tell application "System Events"
-                if not (exists login item "AleClip") then
-                    make new login item at end of login items with properties {path:"\(appPath)", hidden:false, name:"AleClip"}
+                if (exists login item "AleClip") then
+                    delete login item "AleClip"
+                end if
+                if not (exists login item "Clipale") then
+                    make new login item at end of login items with properties {path:"\(appPath)", hidden:false, name:"Clipale"}
                 end if
             end tell
             """
         } else {
             script = """
             tell application "System Events"
+                if (exists login item "Clipale") then
+                    delete login item "Clipale"
+                end if
                 if (exists login item "AleClip") then
                     delete login item "AleClip"
                 end if
@@ -76,7 +82,7 @@ public final class LaunchAtLoginManager: @unchecked Sendable {
         if let appleScript = NSAppleScript(source: script) {
             appleScript.executeAndReturnError(&error)
             if let err = error {
-                NSLog("[AleClip] AppleScript login item error: \(err)")
+                NSLog("[Clipale] AppleScript login item error: \(err)")
             }
         }
     }

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Colorful Logo Watermark View (AleClip Signature Brand)
+// MARK: - Colorful Logo Watermark View (Clipale Signature Brand)
 
 public struct WatermarkView: View {
     @Environment(\.colorScheme) private var colorScheme

@@ -20,17 +20,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Start background clipboard polling
         ClipboardMonitor.shared.start()
 
+        // Initialize the receiver even when this Mac has not copied anything yet.
+        // Otherwise incoming phone clips are not polled until Settings or a local copy.
+        CloudSyncService.shared.scheduleSync(delay: 0.5)
+
         // Sync Launch at Login state
         LaunchAtLoginManager.shared.syncWithSetting(StorageService.shared.settings.launchAtLogin)
 
-        print("AleClip: Application launched and monitoring clipboard.")
+        print("Clipale: Application launched and monitoring clipboard.")
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
         ClipboardMonitor.shared.stop()
         HotkeyManager.shared.unregisterHotkey()
         StorageService.shared.saveHistory()
-        print("AleClip: Application terminated safely.")
+        print("Clipale: Application terminated safely.")
     }
 
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

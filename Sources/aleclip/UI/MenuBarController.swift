@@ -18,13 +18,13 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            if let image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: "AleClip") {
+            if let image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: "Clipale") {
                 image.isTemplate = true
                 button.image = image
             } else {
                 button.title = "📋"
             }
-            button.toolTip = "AleClip - Clipboard History (⌥V)"
+            button.toolTip = "Clipale - Clipboard History (⌥V)"
         }
 
         let menu = NSMenu()
@@ -35,7 +35,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     public func menuWillOpen(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // 1. About AleClip
+        // 1. About Clipale
         let aboutItem = NSMenuItem(
             title: loc("menu.about"),
             action: #selector(openAboutAction),
